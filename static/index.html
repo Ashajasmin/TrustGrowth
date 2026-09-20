@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TG Opportunity Finder</title>
+<style>
+:root{
+  --bg:#f7f7f5; --panel:#ffffff; --side:#f0efea; --ink:#1f1e1c; --muted:#75726c; --line:#e4e2dc;
+  --brand:#b4552b; --brand-ink:#ffffff; --brand-soft:#f6ece6;
+  --bot:transparent; --me:#eceae3;
+  --ok:#2f7d54; --ok-soft:#e3f1e8; --warn:#9a6508; --warn-soft:#faf0dc; --prog:#2f5ea8; --prog-soft:#e6edf9;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 6px 20px rgba(0,0,0,.05);
+  --radius:12px;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#20201d; --panel:#26262330; --side:#191917; --ink:#ececea; --muted:#9a968e; --line:#38373300;
+    --panel:#262623; --line:#383733; --brand:#cc7a52; --brand-ink:#1a1a18; --brand-soft:#33251e;
+    --me:#302f2b; --ok:#5fbb84; --ok-soft:#1d2f24; --warn:#d7a04a; --warn-soft:#332818; --prog:#7ba3e0; --prog-soft:#1e2839;
+    --shadow:none; }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;border:3px solid transparent;background-clip:content-box}
+
+.app{display:grid;grid-template-columns:262px minmax(0,1fr) 348px;height:100vh}
+
+/* ---------------- sidebar ---------------- */
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.logo{display:flex;align-items:center;gap:10px;padding:18px 16px 12px;font-weight:650;font-size:14.5px}
+.logo i{width:32px;height:32px;border-radius:9px;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-style:normal;font-size:12.5px;font-weight:700;letter-spacing:.5px}
+.logo small{display:block;font-weight:450;color:var(--muted);font-size:11.5px;line-height:1.3}
+.newbtn{margin:6px 12px 10px;padding:9px 12px;border:1px solid var(--line);background:var(--panel);border-radius:10px;font-weight:600;font-size:13.5px;text-align:left;display:flex;gap:8px;align-items:center}
+.newbtn:hover{border-color:var(--brand);color:var(--brand)}
+.side h4{margin:10px 16px 4px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:650}
+#sessions{overflow:auto;flex:1;padding:0 8px 12px}
+.sess{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:9px;margin:1px 0}
+.sess:hover{background:var(--panel)} .sess.on{background:var(--panel);box-shadow:var(--shadow)}
+.sess b{display:block;font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sess span{font-size:11.5px;color:var(--muted)}
+.foot{padding:12px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+
+/* ---------------- centre ---------------- */
+.main{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;background:var(--bg)}
+.top{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--line)}
+.top .t{flex:1;min-width:0}
+.top .t b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .t small{color:var(--muted);font-size:12px}
+.seg{display:inline-flex;background:var(--side);border:1px solid var(--line);border-radius:10px;padding:2px}
+.seg button{border:0;background:none;padding:5px 11px;border-radius:8px;font-size:12.5px;color:var(--muted)}
+.seg button.on{background:var(--panel);color:var(--ink);font-weight:600;box-shadow:var(--shadow)}
+.iconbtn{display:none;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:6px 10px;font-size:13px}
+#scroll{flex:1;overflow:auto;padding:20px 0 8px}
+.col{max-width:760px;margin:0 auto;padding:0 22px}
+.row{display:flex;gap:12px;margin:18px 0;align-items:flex-start}
+.row.me{justify-content:flex-end}
+.av{flex:none;width:28px;height:28px;border-radius:8px;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-size:10.5px;font-weight:700}
+.bub{max-width:90%;overflow-wrap:anywhere}
+.me .bub{background:var(--me);padding:10px 15px;border-radius:14px;border-bottom-right-radius:5px;white-space:pre-wrap;max-width:80%}
+.bot .bub{padding-top:2px}
+.bub p{margin:0 0 10px} .bub p:last-child{margin:0}
+.bub ul{margin:6px 0 12px;padding-left:20px} .bub li{margin:3px 0}
+.bub b{font-weight:650}
+.tag{display:inline-block;font-size:10.5px;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600;padding:1px 6px;border-radius:5px;background:var(--brand-soft);color:var(--brand);vertical-align:1px}
+.err .bub{background:var(--warn-soft);color:var(--warn);padding:10px 14px;border-radius:12px}
+.dots{display:inline-flex;gap:4px;padding:6px 0}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:b 1.2s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,60%,100%{opacity:.25;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.sys{text-align:center;color:var(--muted);font-size:12.5px;margin:12px 0}
+.done{border:1px solid var(--ok);background:var(--ok-soft);border-radius:var(--radius);padding:14px 16px;margin:18px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.done b{color:var(--ok)}
+.btn{border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:10px;font-weight:600;font-size:13.5px}
+.btn.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn:hover{filter:brightness(.96)}
+.btn:disabled{opacity:.5;cursor:default;filter:none}
+
+/* composer */
+.comp{padding:6px 0 14px}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font-size:12.5px}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.chip.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.box{display:flex;gap:8px;align-items:flex-end;border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:9px 9px 9px 15px;box-shadow:var(--shadow)}
+.box:focus-within{border-color:var(--brand)}
+textarea{flex:1;border:0;outline:0;background:none;resize:none;font:inherit;color:var(--ink);max-height:170px;padding:5px 0}
+.send{border:0;background:var(--brand);color:var(--brand-ink);border-radius:10px;width:36px;height:34px;font-size:15px}
+.send:disabled{opacity:.35;cursor:default}
+.note{margin-top:7px;font-size:11.5px;color:var(--muted);text-align:center}
+
+/* welcome */
+.welcome{max-width:680px;margin:6vh auto 0;padding:0 24px;text-align:center}
+.welcome h1{margin:0 0 8px;font-size:30px;font-weight:650;letter-spacing:-.4px}
+.welcome .lede{color:var(--muted);margin:0 auto 22px;max-width:520px}
+.flow{display:flex;gap:8px;justify-content:center;margin:0 0 22px;flex-wrap:wrap}
+.flow div{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;color:var(--muted)}
+.flow b{color:var(--ink);font-weight:600}
+.grid8{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:0 0 22px;text-align:left}
+.grid8 div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-size:13.5px}
+.grid8 b{color:var(--brand);margin-right:7px;font-family:ui-monospace,Menlo,Consolas,monospace}
+
+/* ---------------- right panel ---------------- */
+.right{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:none;padding:13px 4px;color:var(--muted);font-weight:600;font-size:12.5px;border-bottom:2px solid transparent}
+.tabs button.on{color:var(--brand);border-color:var(--brand)}
+.pane{flex:1;overflow:auto;padding:14px 16px;display:none} .pane.on{display:block}
+.bar{height:7px;background:var(--side);border-radius:6px;overflow:hidden;margin:7px 0 5px;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:var(--brand);width:0;transition:width .4s}
+.small{font-size:12px;color:var(--muted)}
+.pr{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.pr .n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--side);border:1px solid var(--line);font-size:10.5px;font-weight:700;display:grid;place-items:center;color:var(--muted)}
+.pr .l{flex:1;font-size:13px}
+.pr.ask .n{border-color:var(--brand);color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.st{font-size:10.5px;font-weight:650;padding:2px 8px;border-radius:999px;background:var(--side);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.st.covered{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.st.gap{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.st.partial{background:var(--prog-soft);color:var(--prog);border-color:transparent}
+.grp{margin:0 0 14px}
+.grp h5{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.it{font-size:12.8px;border-left:3px solid var(--line);padding:3px 0 3px 9px;margin:6px 0}
+.it.fact{border-color:var(--ok)} .it.gap{border-color:var(--warn)}
+.it.assumption,.it.decision,.it.alternative{border-color:var(--prog)}
+.it em{font-style:normal;font-size:10px;font-weight:700;color:var(--muted);margin-right:5px;text-transform:uppercase;letter-spacing:.03em}
+.stage{display:flex;gap:10px;padding:7px 0;font-size:13px}
+.stage .dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--line);margin-top:6px}
+.stage.now .dot{background:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.stage.done .dot{background:var(--ok)}
+.stage small{display:block;color:var(--muted);font-size:11.5px}
+.callout{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:9px 12px;font-size:12px;margin:12px 0}
+
+/* ---------------- report ---------------- */
+.reportView{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;z-index:6}
+.reportView.on{display:flex}
+.rtop{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.rtop .rt{flex:1;min-width:0}
+.rtop .rt b{display:block;font-size:14.5px}
+.rtop .rt small{color:var(--muted);font-size:12px}
+.reportScroll{flex:1;overflow:auto;padding:26px 0 70px}
+.rcol{max-width:840px;margin:0 auto;padding:0 26px}
+.rcol h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:30px 0 10px;font-weight:650}
+.rhead{font-size:25px;font-weight:650;letter-spacing:-.3px;margin:0 0 6px}
+.rlede{color:var(--muted);margin:0 0 4px;font-size:15px}
+.rsec{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin:9px 0}
+.rsec h3{margin:0 0 6px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+.rsec h3 i{font-style:normal;font-size:10.5px;font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+.rsec p{margin:0;font-size:13.5px;line-height:1.65;color:var(--ink)}
+.rlist{list-style:none;margin:0;padding:0}
+.rlist li{border-left:3px solid var(--prog);background:var(--panel);border-radius:0 10px 10px 0;padding:8px 12px;margin:7px 0;font-size:13.5px;line-height:1.6}
+.rlist.findings li{border-color:var(--ok)}
+.rlist.reco li{border-color:var(--brand)}
+.altcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;margin:9px 0;box-shadow:var(--shadow)}
+.altype{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--brand);background:var(--brand-soft);border-radius:6px;padding:2px 8px;margin-bottom:7px}
+.altcard h3{margin:0 0 6px;font-size:14.5px}
+.altcard p{margin:0 0 6px;font-size:13.2px;line-height:1.6}
+.altcard .fit{color:var(--muted);margin:0;font-size:12.8px}
+.rnote{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 13px;font-size:12.5px;margin:16px 0}
+.rloading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:var(--muted);text-align:center;padding:0 40px}
+.spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---------------- modal ---------------- */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:center;z-index:30}
+.modal.on{display:grid}
+.card{background:var(--panel);border-radius:16px;padding:22px;width:min(400px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.card h3{margin:0 0 4px}
+.card input{width:100%;margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+.card .acts{display:flex;gap:8px;justify-content:flex-end}
+
+@media (max-width:1180px){ .app{grid-template-columns:250px minmax(0,1fr)}
+  .right{position:fixed;right:0;top:0;bottom:0;width:min(348px,92vw);transform:translateX(100%);transition:transform .25s;z-index:12}
+  .right.open{transform:none;box-shadow:-8px 0 30px rgba(0,0,0,.2)} .iconbtn.r{display:inline-block} }
+@media (max-width:820px){ .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;left:0;top:0;bottom:0;width:min(280px,88vw);transform:translateX(-100%);transition:transform .25s;z-index:12}
+  .side.open{transform:none;box-shadow:8px 0 30px rgba(0,0,0,.2)} .iconbtn.l{display:inline-block} .grid8{grid-template-columns:1fr} }
+@media print{ .side,.right,.top,.comp,.rtop{display:none!important} .reportView{position:static} .reportScroll{overflow:visible} }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side" id="side">
+    <div class="logo"><i>TG</i><div>Opportunity Finder<small>TrustGrowth Services LLP &times; CIT</small></div></div>
+    <button class="newbtn" id="newBtn"><span>+</span> New intake conversation</button>
+    <h4>Conversations</h4>
+    <div id="sessions"></div>
+    <div class="foot">Stage 1 &mdash; Intake conversation, then the consolidated Opportunity Evaluation Report.</div>
+  </aside>
+
+  <section class="main">
+    <div class="top">
+      <button class="iconbtn l" id="menuBtn" title="Conversations">&#9776;</button>
+      <div class="t"><b id="title">TG Opportunity Finder</b><small id="sub">Intake conversation</small></div>
+      <div class="seg" id="seg" title="How detailed should the conversation be?">
+        <button data-m="brief">Brief</button><button data-m="balanced">Balanced</button><button data-m="detailed">Detailed</button>
+      </div>
+      <button class="btn" id="reportBtn" style="display:none">Report</button>
+      <button class="iconbtn r" id="panelBtn" title="Project state">State</button>
+    </div>
+
+    <div id="scroll"><div class="col" id="msgs"></div></div>
+
+    <div class="comp" id="comp"><div class="col">
+      <div class="chips" id="chips"></div>
+      <div class="box">
+        <textarea id="inp" rows="1" placeholder="Type your answer, or ask me a question..."></textarea>
+        <button class="send" id="sendBtn" title="Send">&#10148;</button>
+      </div>
+      <div class="note">Everything you say is stored as owner-stated and is not independently verified at this stage.</div>
+    </div></div>
+
+    <!-- Opportunity Evaluation Report -->
+    <div class="reportView" id="reportView">
+      <div class="rtop">
+        <button class="btn" id="backBtn">&larr; Back to conversation</button>
+        <div class="rt" style="text-align:center"><b>Opportunity Evaluation Report</b><small id="rsub"></small></div>
+        <button class="btn" id="printBtn">Print / PDF</button>
+        <button class="btn" id="rdlBtn">Download JSON</button>
+      </div>
+      <div class="reportScroll"><div class="rcol" id="reportBody"></div></div>
+    </div>
+  </section>
+
+  <aside class="right" id="right">
+    <div class="tabs" id="tabs">
+      <button data-t="prog" class="on">Intake</button>
+      <button data-t="cap">Project state</button>
+      <button data-t="road">Pipeline</button>
+    </div>
+    <div class="pane on" id="p-prog"></div>
+    <div class="pane" id="p-cap"></div>
+    <div class="pane" id="p-road"></div>
+  </aside>
+</div>
+
+<div class="modal" id="modal"><div class="card">
+  <h3>New intake conversation</h3>
+  <div class="small">Who are we speaking with? (optional)</div>
+  <input id="nameInp" placeholder="e.g. Mr. Goyal" autocomplete="off">
+  <div class="acts"><button class="btn" id="cancelBtn">Cancel</button><button class="btn pri" id="startBtn">Start</button></div>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const S = { sid: null, view: null, busy: false, report: null };
+
+/* the 8 company-defined input parameters, in the order given in the brief.
+   'objective' (the idea itself) is asked first and shown separately.        */
+const EIGHT = [
+  ['strengths','Strengths'],
+  ['existing_business','Existing business or employment'],
+  ['capabilities','Capabilities'],
+  ['customers','Customers'],
+  ['feedstock_access','Feedstock access'],
+  ['geography_capital','Geography and capital'],
+  ['risk_appetite','Risk appetite'],
+  ['strategic_ambitions','Strategic ambitions']
+];
+const LABEL = Object.fromEntries([
+  ['objective','The opportunity (idea, scale, reason)'], ...EIGHT,
+  ['constraints','Key constraints'], ['scope','Scope of analysis']
+]);
+const KIND   = { fact:'Fact', assumption:'Assumption', decision:'Decision', alternative:'Alternative', gap:'Information gap' };
+const GAP    = { unknown_to_owner:'not known', not_provided:'not provided', ambiguous:'needs clarification', conflict:'conflict' };
+const STATUS = { covered:'Captured', gap:'Unknown', partial:'In progress', empty:'Not asked yet' };
+const ALTYPE = { product:'Different product', technology_variant:'Technology variant', derivative:'Derivative',
+                 upstream:'Upstream', downstream:'Downstream', adjacent_business:'Adjacent business' };
+
+/* the nine evaluation dimensions from the brief, mapped to report fields */
+const SECTIONS = [
+  ['market_analysis','Market','demand, size, growth'],
+  ['technology_analysis','Technology','routes, process, equipment'],
+  ['raw_materials_analysis','Raw materials','feedstock availability and cost'],
+  ['competition_analysis','Competition','who else, and why you would win'],
+  ['capex_analysis','CAPEX','capital to build it'],
+  ['operating_economics_analysis','Operating economics','margins and running cost'],
+  ['financing_analysis','Financing','own funds, debt, structure'],
+  ['risk_analysis','Risks','what could go wrong, and mitigation'],
+  ['strategic_fit_analysis','Strategic fit','fit with your business and ambitions']
+];
+
+/* ---------------- helpers ---------------- */
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const inline = s => s
+  .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+  .replace(/(^|\s)_(.+?)_(?=\s|$|[.,)])/g, '$1<i>$2</i>')
+  .replace(/\[([FAGDL]\d+)\]/g, '<span class="tag">$1</span>');
+function md(text){
+  let html = '', list = false, para = [];
+  const flush = () => { if (para.length) { html += '<p>' + para.join('<br>') + '</p>'; para = []; } };
+  for (const l of esc(text).split('\n')) {
+    if (/^- /.test(l)) { flush(); if (!list) { html += '<ul>'; list = true; } html += '<li>' + inline(l.slice(2)) + '</li>'; }
+    else { if (list) { html += '</ul>'; list = false; } if (!l.trim()) flush(); else para.push(inline(l)); }
+  }
+  flush(); if (list) html += '</ul>';
+  return html;
+}
+async function api(method, url, body){
+  const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined });
+  let data = null;
+  try { data = await r.json(); } catch (e) { /* empty body */ }
+  if (!r.ok) { const e = new Error((data && data.detail) || ('Server error ' + r.status)); e.status = r.status; throw e; }
+  return data;
+}
+const scrollDown = () => { const s = $('#scroll'); s.scrollTop = s.scrollHeight; };
+const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m/60) + ' h ago' : Math.round(m/1440) + ' d ago'; };
+function saveBlob(obj, name){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ---------------- messages ---------------- */
+function addMsg(role, text, cls){
+  const row = document.createElement('div');
+  row.className = 'row ' + (role === 'owner' ? 'me' : 'bot') + (cls ? ' ' + cls : '');
+  row.innerHTML = role === 'owner'
+    ? '<div class="bub">' + esc(text) + '</div>'
+    : '<div class="av">TG</div><div class="bub">' + md(text) + '</div>';
+  $('#msgs').appendChild(row); scrollDown(); return row;
+}
+function typing(){
+  const row = document.createElement('div'); row.className = 'row bot'; row.id = 'typing';
+  row.innerHTML = '<div class="av">TG</div><div class="bub"><span class="dots"><i></i><i></i><i></i></span></div>';
+  $('#msgs').appendChild(row); scrollDown();
+}
+const untyping = () => { const t = $('#typing'); if (t) t.remove(); };
+function sysNote(t){ const d = document.createElement('div'); d.className = 'sys'; d.textContent = t; $('#msgs').appendChild(d); scrollDown(); }
+function doneCard(){
+  if ($('#doneCard')) return;
+  const c = document.createElement('div'); c.className = 'done'; c.id = 'doneCard';
+  c.innerHTML = '<div style="flex:1;min-width:210px"><b>Intake confirmed and saved.</b>' +
+    '<div class="small">Your shared project state is ready. The evaluation report is generated from it &mdash; nothing else.</div></div>' +
+    '<button class="btn pri" id="genBtn">Generate evaluation report</button>' +
+    '<button class="btn" id="dlBtn">Download hand-off</button>';
+  $('#msgs').appendChild(c); scrollDown();
+  $('#genBtn').onclick = () => openReport(true);
+  $('#dlBtn').onclick = downloadHandoff;
+}
+
+/* ---------------- welcome ---------------- */
+function welcome(){
+  S.sid = null; S.view = null; S.report = null; localStorage.removeItem('tg_sid');
+  closeReport();
+  $('#msgs').innerHTML =
+    '<div class="welcome">' +
+    '<h1>Before you commit capital.</h1>' +
+    '<p class="lede">I get to know you and your manufacturing idea, evaluate it on evidence, challenge it, ' +
+    'and look for opportunities that may fit you better.</p>' +
+    '<div class="flow"><div><b>1</b> Intake conversation</div><div><b>2</b> Evaluation</div><div><b>3</b> Report &amp; alternatives</div></div>' +
+    '<div class="grid8">' + EIGHT.map((e, i) => '<div><b>' + (i + 1) + '</b>' + e[1] + '</div>').join('') + '</div>' +
+    '<button class="btn pri" id="wStart">Start intake conversation</button></div>';
+  $('#wStart').onclick = openModal;
+  $('#comp').style.display = 'none'; $('#seg').style.visibility = 'hidden'; $('#reportBtn').style.display = 'none';
+  $('#title').textContent = 'TG Opportunity Finder'; $('#sub').textContent = 'Intake conversation';
+  renderPanel(null); loadSessions();
+}
+
+/* ---------------- right panel ---------------- */
+function renderPanel(v){
+  const cov = v ? Object.fromEntries(v.coverage.map(c => [c.key, c.status])) : {};
+  const done = v ? v.coverage.filter(c => c.status === 'covered' || c.status === 'gap').length : 0;
+  const total = v ? v.coverage.length : 9, pct = Math.round(done / total * 100);
+  const row = (key, label, n) => {
+    const st = cov[key] || 'empty', ask = v && v.asking === key && v.phase === 'intake';
+    return '<div class="pr' + (ask ? ' ask' : '') + '"><div class="n">' + n + '</div><div class="l">' + label +
+           '</div><span class="st ' + st + '">' + STATUS[st] + '</span></div>';
+  };
+  $('#p-prog').innerHTML =
+    '<div class="small">Intake progress' + (v ? ' &middot; ' + v.phase.replace(/_/g,' ') : '') + '</div>' +
+    '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+    '<div class="small">' + done + ' of ' + total + ' areas covered or recorded as unknown</div>' +
+    '<div style="height:10px"></div>' + row('objective', LABEL.objective, '&#9733;') +
+    '<div class="small" style="margin:13px 0 2px">The 8 input parameters</div>' +
+    EIGHT.map((e, i) => row(e[0], e[1], i + 1)).join('') +
+    '<div class="callout">&ldquo;Unknown&rdquo; means you said you do not know, or it was not provided. ' +
+    'It is recorded honestly as an information gap and never guessed.</div>';
+
+  const groups = ['objective', ...EIGHT.map(e => e[0]), 'constraints', 'scope'];
+  const items = v ? v.items : [];
+  let html = '';
+  for (const g of groups) {
+    const list = items.filter(i => i.param === g);
+    if (!list.length) continue;
+    html += '<div class="grp"><h5>' + LABEL[g] + '</h5>' + list.map(i =>
+      '<div class="it ' + i.kind + '"><em>' + KIND[i.kind] +
+      (i.kind === 'gap' && i.gap_type ? ' &middot; ' + (GAP[i.gap_type] || i.gap_type) : '') + '</em>' + esc(i.statement) +
+      (i.origin === 'system' ? ' <span class="small">(assumed by the system &mdash; please confirm)</span>' : '') +
+      ' <span class="tag">' + i.id + '</span></div>').join('') + '</div>';
+  }
+  $('#p-cap').innerHTML = html ||
+    '<div class="small">Nothing captured yet. Facts, assumptions, decisions, alternatives and information gaps ' +
+    'appear here as you answer &mdash; each one tied to your own words.</div>';
+
+  const phase = v ? v.phase : '';
+  const stages = [
+    ['Intake conversation','The 8 parameters, your idea, constraints and scope', phase === 'complete' ? 2 : 1],
+    ['Shared project state','Facts, assumptions, decisions, alternatives, gaps, evidence', phase === 'complete' ? 2 : 0],
+    ['Evaluation','Market, technology, raw materials, competition, CAPEX, operating economics, financing, risk, strategic fit', S.report ? 2 : (phase === 'complete' ? 1 : 0)],
+    ['Challenge &amp; alternatives','Better products, technologies, derivatives, upstream / downstream, adjacent businesses', S.report ? 2 : 0],
+    ['Opportunity Evaluation Report','Analysis, assumptions, findings, recommendations, alternatives', S.report ? 2 : 0],
+    ['Investment decision','Yes / no / with conditions &mdash; yours to make', 0]
+  ];
+  $('#p-road').innerHTML = stages.map(s =>
+    '<div class="stage' + (s[2] === 1 ? ' now' : s[2] === 2 ? ' done' : '') + '"><div class="dot"></div><div>' +
+    s[0] + '<small>' + s[1] + '</small></div></div>').join('') +
+    '<div class="callout">The report is written only from what you confirmed at intake. Anything it could not ground ' +
+    'in your statements is listed as an assumption or an information gap.</div>';
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.t));
+});
+
+/* ---------------- state -> UI ---------------- */
+function applyView(v){
+  S.view = v; S.sid = v.session_id; localStorage.setItem('tg_sid', S.sid);
+  $('#title').textContent = v.owner_name ? 'Intake with ' + v.owner_name : 'Intake conversation';
+  $('#sub').textContent = 'Session ' + v.session_id + ' \u00b7 ' + v.phase.replace(/_/g, ' ');
+  document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.m === v.mode));
+  $('#seg').style.visibility = 'visible';
+  $('#comp').style.display = '';
+  $('#reportBtn').style.display = v.phase === 'complete' ? '' : 'none';
+  renderPanel(v); renderChips();
+}
+function renderChips(){
+  const c = $('#chips'); c.innerHTML = ''; const v = S.view; if (!v) return;
+  const add = (t, txt, pri) => { const b = document.createElement('button');
+    b.className = 'chip' + (pri ? ' pri' : ''); b.textContent = t; b.onclick = () => send(txt || t); c.appendChild(b); };
+  if (v.phase === 'awaiting_confirmation') {
+    add('Confirm', 'confirm', true); add('I want to change something');
+  } else if (v.phase === 'complete') {
+    const b = document.createElement('button'); b.className = 'chip pri';
+    b.textContent = 'Open evaluation report'; b.onclick = () => openReport(!S.report); c.appendChild(b);
+    add('I want to add something else');
+  } else {
+    add("I don't know"); add('Skip this one'); add('Why do you ask this?'); add('What does that mean?');
+  }
+}
+
+/* ---------------- actions ---------------- */
+async function send(text){
+  text = (text || '').trim();
+  if (!text || S.busy || !S.sid) return;
+  S.busy = true; $('#sendBtn').disabled = true; $('#inp').value = ''; autosize();
+  const card = $('#doneCard'); if (card) card.remove();
+  addMsg('owner', text); typing();
+  try {
+    const v = await api('POST', '/api/session/' + S.sid + '/message', { text });
+    untyping(); addMsg('assistant', v.reply); applyView(v);
+    if (v.complete) doneCard();
+    loadSessions();
+  } catch (e) {
+    untyping();
+    addMsg('assistant', 'Sorry, that did not go through (' + e.message + '). Please send it again.', 'err');
+  }
+  S.busy = false; $('#sendBtn').disabled = false; $('#inp').focus();
+}
+async function setMode(m){
+  if (!S.sid || S.busy) return;
+  try { const v = await api('POST', '/api/session/' + S.sid + '/mode', { mode: m });
+        applyView(v); sysNote('Detail level changed to ' + m + '.'); }
+  catch (e) { sysNote('Could not change the detail level: ' + e.message); }
+}
+async function downloadHandoff(){
+  if (!S.sid) return;
+  try { saveBlob(await api('GET', '/api/session/' + S.sid + '/handoff'), 'tg-intake-' + S.sid + '.json'); }
+  catch (e) { alert('Could not download the hand-off: ' + e.message); }
+}
+async function openSession(id){
+  try {
+    const v = await api('GET', '/api/session/' + id);
+    $('#msgs').innerHTML = '';
+    for (const t of v.transcript) addMsg(t.role, t.text);
+    S.report = null; applyView(v);
+    if (v.phase === 'complete') { doneCard(); loadReportIfAny(); }
+    closeDrawers(); loadSessions();
+  } catch (e) { welcome(); }
+}
+async function newSession(){
+  const name = $('#nameInp').value.trim(); closeModal();
+  try {
+    const v = await api('POST', '/api/session', { owner_name: name });
+    $('#msgs').innerHTML = ''; S.report = null; closeReport();
+    addMsg('assistant', v.reply); applyView(v); closeDrawers(); loadSessions(); $('#inp').focus();
+  } catch (e) { alert('Could not start the session: ' + e.message); }
+}
+async function loadSessions(){
+  try {
+    const list = await api('GET', '/api/sessions');
+    $('#sessions').innerHTML = list.map(s =>
+      '<button class="sess' + (s.id === S.sid ? ' on' : '') + '" data-id="' + s.id + '"><b>' +
+      esc(s.owner || 'Untitled intake') + '</b><span>' + s.mode + ' &middot; ' +
+      s.phase.replace(/_/g,' ') + ' &middot; ' + ago(s.updated) + '</span></button>').join('') ||
+      '<div class="small" style="padding:8px 10px">No conversations yet.</div>';
+    document.querySelectorAll('.sess').forEach(b => b.onclick = () => openSession(b.dataset.id));
+  } catch (e) { /* the sidebar is optional */ }
+}
+
+/* ---------------- opportunity evaluation report ---------------- */
+async function loadReportIfAny(){
+  if (!S.sid) return;
+  try { S.report = await api('GET', '/api/session/' + S.sid + '/report'); renderPanel(S.view); }
+  catch (e) { S.report = null; }                       // 404 simply means none generated yet
+}
+function closeReport(){ $('#reportView').classList.remove('on'); }
+async function openReport(generate){
+  if (!S.sid) return;
+  $('#reportView').classList.add('on');
+  $('#rsub').textContent = 'Session ' + S.sid;
+  if (S.report && !generate) { renderReport(S.report); return; }
+  if (!S.report && !generate) { await loadReportIfAny(); if (S.report) { renderReport(S.report); return; } }
+
+  $('#reportBody').innerHTML = '';
+  $('#reportBody').parentElement.innerHTML =
+    '<div class="rloading"><div class="spin"></div><b>Evaluating the opportunity</b>' +
+    '<div class="small">Market, technology, raw materials, competition, CAPEX, operating economics, financing, ' +
+    'risk and strategic fit &mdash; then challenging the idea and looking for better-fitting alternatives. ' +
+    'This takes a while.</div></div>';
+  try {
+    S.report = await api('POST', '/api/session/' + S.sid + '/report');
+    renderReport(S.report); renderPanel(S.view);
+  } catch (e) {
+    document.querySelector('.reportScroll').innerHTML =
+      '<div class="rcol"><div class="rnote"><b>The report could not be generated.</b><br>' + esc(e.message) +
+      '</div><button class="btn" onclick="openReport(true)">Try again</button></div>';
+  }
+}
+function para(t){ return '<p>' + esc(t || '').replace(/\n/g, '<br>') + '</p>'; }
+function renderReport(r){
+  const scroll = document.querySelector('.reportScroll');
+  const owner = S.view && S.view.owner_name ? ' for ' + S.view.owner_name : '';
+  let h = '<div class="rcol" id="reportBody">';
+
+  h += '<div class="rhead">Opportunity Evaluation Report' + esc(owner) + '</div>';
+  h += '<p class="rlede">' + esc(r.idea_summary || '') + '</p>';
+  h += '<div class="rnote">Evidence-based, but not independently verified. Every statement is built from what you ' +
+       'stated at intake plus the assumptions listed below. Check the assumptions before you commit capital.</div>';
+
+  h += '<h2>1 &middot; Analysis</h2>';
+  h += SECTIONS.map((s, i) => '<div class="rsec"><h3><i>' + (i + 1) + '</i>' + s[1] + ' <span class="small" style="font-weight:400">&mdash; ' + s[2] + '</span></h3>' + para(r[s[0]]) + '</div>').join('');
+
+  h += '<h2>2 &middot; Assumptions this report relies on</h2>';
+  h += (r.assumptions && r.assumptions.length)
+    ? '<ul class="rlist">' + r.assumptions.map(a => '<li>' + esc(a) + '</li>').join('') + '</ul>'
+    : '<div class="small">No assumptions were recorded.</div>';
+
+  h += '<h2>3 &middot; Findings</h2>';
+  h += (r.findings && r.findings.length)
+    ? '<ul class="rlist findings">' + r.findings.map(f => '<li>' + esc(f) + '</li>').join('') + '</ul>'
+    : '<div class="small">No findings were recorded.</div>';
+
+  h += '<h2>4 &middot; Recommendations</h2>';
+  h += (r.recommendations && r.recommendations.length)
+    ? '<ul class="rlist reco">' + r.recommendations.map((c, i) => '<li><b>' + (i + 1) + '.</b> ' + esc(c) + '</li>').join('') + '</ul>'
+    : '<div class="small">No recommendations were recorded.</div>';
+
+  h += '<h2>5 &middot; Alternative opportunities to consider</h2>';
+  h += '<p class="small" style="margin:0 0 8px">Your original idea, challenged. These are products, technology ' +
+       'variants, derivatives, upstream / downstream steps and adjacent businesses that may fit your own strengths, ' +
+       'capabilities, feedstock, customers and geography better.</p>';
+  h += (r.alternative_opportunities && r.alternative_opportunities.length)
+    ? r.alternative_opportunities.map(a =>
+        '<div class="altcard"><span class="altype">' + esc(ALTYPE[a.type] || a.type || 'Alternative') + '</span>' +
+        '<h3>' + esc(a.name || '') + '</h3><p>' + esc(a.rationale || '') + '</p>' +
+        '<p class="fit"><b>Fit with you:</b> ' + esc(a.fit_with_owner || '') + '</p></div>').join('')
+    : '<div class="small">No alternatives were proposed.</div>';
+
+  h += '<div style="height:30px"></div></div>';
+  scroll.innerHTML = h;
+}
+
+/* ---------------- wiring ---------------- */
+const openModal  = () => { $('#modal').classList.add('on'); $('#nameInp').value = ''; setTimeout(() => $('#nameInp').focus(), 30); };
+const closeModal = () => $('#modal').classList.remove('on');
+const closeDrawers = () => { $('#side').classList.remove('open'); $('#right').classList.remove('open'); };
+function autosize(){ const t = $('#inp'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 170) + 'px'; }
+
+$('#newBtn').onclick = openModal;
+$('#startBtn').onclick = newSession;
+$('#cancelBtn').onclick = closeModal;
+$('#nameInp').onkeydown = e => { if (e.key === 'Enter') newSession(); };
+$('#sendBtn').onclick = () => send($('#inp').value);
+$('#inp').oninput = autosize;
+$('#inp').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send($('#inp').value); } };
+document.querySelectorAll('#seg button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+$('#menuBtn').onclick = () => $('#side').classList.toggle('open');
+$('#panelBtn').onclick = () => $('#right').classList.toggle('open');
+$('#reportBtn').onclick = () => openReport(false);
+$('#backBtn').onclick = closeReport;
+$('#printBtn').onclick = () => window.print();
+$('#rdlBtn').onclick = () => { if (S.report) saveBlob(S.report, 'tg-report-' + S.sid + '.json'); };
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+document.onkeydown = e => { if (e.key === 'Escape') { closeModal(); closeReport(); } };
+
+const saved = localStorage.getItem('tg_sid');
+if (saved) openSession(saved); else welcome();
+</script>
+</body>
+</html>

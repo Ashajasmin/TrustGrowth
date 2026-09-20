@@ -1,0 +1,6 @@
+google-genai
+pydantic>=2.5
+python-dotenv
+fastapi
+uvicorn
+pytest
