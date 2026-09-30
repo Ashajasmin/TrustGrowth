@@ -26,7 +26,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;border:3px solid transparent;background-clip:content-box}
 
-.app{display:grid;grid-template-columns:262px minmax(0,1fr) 348px;height:100vh}
+.app{display:grid;grid-template-columns:262px minmax(0,1fr);height:100vh}
 
 /* ---------------- sidebar ---------------- */
 .side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
@@ -132,6 +132,46 @@ textarea{flex:1;border:0;outline:0;background:none;resize:none;font:inherit;colo
 .stage small{display:block;color:var(--muted);font-size:11.5px}
 .callout{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:9px 12px;font-size:12px;margin:12px 0}
 
+/* the captured-state panel is a drawer, closed by default: the owner talks, they do not fill in a form */
+.right{position:fixed;right:0;top:0;bottom:0;width:min(348px,92vw);transform:translateX(100%);transition:transform .25s;z-index:12}
+.right.open{transform:none;box-shadow:-8px 0 30px rgba(0,0,0,.2)}
+.iconbtn.r{display:inline-block}
+/* closed drawer: also hidden and unclickable, so it can never linger on screen if the slide-out is interrupted */
+.right:not(.open){visibility:hidden;pointer-events:none;transition:transform .25s,visibility 0s .25s}
+.seg{display:none!important}
+.tabs .x{flex:none;width:46px;font-size:24px;line-height:1;padding:0;color:var(--muted);border-bottom:2px solid transparent}
+.tabs .x:hover{color:var(--ink)}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .25s;z-index:11}
+body.drawer .scrim{opacity:1;pointer-events:auto}
+.pathcard{border:1px solid var(--line);border-left:3px solid var(--brand);background:var(--panel);border-radius:10px;padding:10px 14px;margin:10px 0}
+.pathcard p{margin:0 0 6px}
+.pathcard ul{margin:4px 0 0;padding-left:18px}
+.pathtag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--brand);background:var(--brand-soft);border-radius:6px;padding:2px 8px;margin-bottom:6px}
+.pathact{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pathact button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 11px;font-size:12px}
+.pathact button:hover{border-color:var(--brand);color:var(--brand)}
+.askline{border-left:3px solid var(--brand);padding:2px 0 2px 12px;margin:14px 0 2px;font-weight:600}
+.who{margin:12px 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.who.sys{color:var(--brand)}
+.it.suggestion{border-color:var(--brand)}
+.it .sg{display:block;margin-top:3px;color:var(--muted);font-size:12px}
+.rx{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:6px;padding:1px 7px;margin-left:4px;background:var(--side);color:var(--muted)}
+.rx.likes{background:var(--ok-soft);color:var(--ok)} .rx.dislikes{background:var(--warn-soft);color:var(--warn)} .rx.wants_changed,.rx.unsure{background:var(--prog-soft);color:var(--prog)}
+.swot{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quad{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.quad h3{margin:0 0 2px;font-size:13.5px}
+.quad .scope{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.pt{font-size:13px;line-height:1.55;padding:6px 0;border-top:1px solid var(--line)}
+.pt:first-of-type{border-top:0}
+.ptmeta{margin-top:3px}
+.basis{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-right:5px}
+.force{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 15px;margin:9px 0}
+.force h3{margin:0 0 6px;font-size:13.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.force p{margin:0 0 6px;font-size:13.3px;line-height:1.6}
+.lvl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:999px;padding:2px 9px;background:var(--side);color:var(--muted)}
+.lvl.low{background:var(--ok-soft);color:var(--ok)} .lvl.moderate{background:var(--prog-soft);color:var(--prog)} .lvl.high{background:var(--warn-soft);color:var(--warn)}
+@media (max-width:700px){ .swot{grid-template-columns:1fr} }
+
 /* ---------------- report ---------------- */
 .reportView{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;z-index:6}
 .reportView.on{display:flex}
@@ -169,6 +209,12 @@ textarea{flex:1;border:0;outline:0;background:none;resize:none;font:inherit;colo
 .card h3{margin:0 0 4px}
 .card input{width:100%;margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
 .card .acts{display:flex;gap:8px;justify-content:flex-end}
+.card [hidden]{display:none!important}
+.autherr{display:none;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:8px 12px;font-size:12.5px;margin:0 0 10px}
+.linkbtn{border:0;background:none;color:var(--brand);padding:0;margin-right:14px;font-size:12.5px;font-weight:600}
+.linkbtn:disabled{opacity:.5;cursor:default}
+#pickList{max-height:260px;overflow:auto;margin:8px 0 12px}
+#codeInp{letter-spacing:.4em;font-size:20px;text-align:center}
 
 @media (max-width:1180px){ .app{grid-template-columns:250px minmax(0,1fr)}
   .right{position:fixed;right:0;top:0;bottom:0;width:min(348px,92vw);transform:translateX(100%);transition:transform .25s;z-index:12}
@@ -185,7 +231,8 @@ textarea{flex:1;border:0;outline:0;background:none;resize:none;font:inherit;colo
   <aside class="side" id="side">
     <div class="logo"><i>TG</i><div>Opportunity Finder<small>TrustGrowth Services LLP &times; CIT</small></div></div>
     <button class="newbtn" id="newBtn"><span>+</span> New intake conversation</button>
-    <h4>Conversations</h4>
+    <button class="newbtn" id="openBtn" style="margin-top:-4px"><span>&#8599;</span> Open an existing conversation</button>
+    <h4>Verified in this tab</h4>
     <div id="sessions"></div>
     <div class="foot">Stage 1 &mdash; Intake conversation, then the consolidated Opportunity Evaluation Report.</div>
   </aside>
@@ -198,7 +245,7 @@ textarea{flex:1;border:0;outline:0;background:none;resize:none;font:inherit;colo
         <button data-m="brief">Brief</button><button data-m="balanced">Balanced</button><button data-m="detailed">Detailed</button>
       </div>
       <button class="btn" id="reportBtn" style="display:none">Report</button>
-      <button class="iconbtn r" id="panelBtn" title="Project state">State</button>
+      <button class="iconbtn r" id="panelBtn" title="What has been captured so far">What I've captured</button>
     </div>
 
     <div id="scroll"><div class="col" id="msgs"></div></div>
@@ -206,10 +253,10 @@ textarea{flex:1;border:0;outline:0;background:none;resize:none;font:inherit;colo
     <div class="comp" id="comp"><div class="col">
       <div class="chips" id="chips"></div>
       <div class="box">
-        <textarea id="inp" rows="1" placeholder="Type your answer, or ask me a question..."></textarea>
+        <textarea id="inp" rows="1" placeholder="Describe your idea in your own words..."></textarea>
         <button class="send" id="sendBtn" title="Send">&#10148;</button>
       </div>
-      <div class="note">Everything you say is stored as owner-stated and is not independently verified at this stage.</div>
+      <div class="note">Everything you say is stored as your own words and is not independently verified at this stage. Paths I suggest are stored separately as system suggestions and never count as your view until you say so.</div>
     </div></div>
 
     <!-- Opportunity Evaluation Report -->
@@ -224,11 +271,13 @@ textarea{flex:1;border:0;outline:0;background:none;resize:none;font:inherit;colo
     </div>
   </section>
 
+  <div class="scrim" id="scrim"></div>
   <aside class="right" id="right">
     <div class="tabs" id="tabs">
-      <button data-t="prog" class="on">Intake</button>
-      <button data-t="cap">Project state</button>
+      <button data-t="prog" class="on">Checklist</button>
+      <button data-t="cap">Captured</button>
       <button data-t="road">Pipeline</button>
+      <button class="x" id="closePanel" title="Close" aria-label="Close panel">&times;</button>
     </div>
     <div class="pane on" id="p-prog"></div>
     <div class="pane" id="p-cap"></div>
@@ -237,15 +286,25 @@ textarea{flex:1;border:0;outline:0;background:none;resize:none;font:inherit;colo
 </div>
 
 <div class="modal" id="modal"><div class="card">
-  <h3>New intake conversation</h3>
-  <div class="small">Who are we speaking with? (optional)</div>
-  <input id="nameInp" placeholder="e.g. Mr. Goyal" autocomplete="off">
-  <div class="acts"><button class="btn" id="cancelBtn">Cancel</button><button class="btn pri" id="startBtn">Start</button></div>
+  <h3 id="authTitle">Verify your email</h3>
+  <div class="small" id="authHelp"></div>
+  <div id="stEmail">
+    <div id="nameRow"><input id="nameInp" placeholder="Your name (optional), e.g. Mr. Goyal" autocomplete="name"></div>
+    <input id="emailInp" type="email" placeholder="you@company.com" autocomplete="email">
+  </div>
+  <div id="stCode" hidden>
+    <div class="small" id="codeHelp"></div>
+    <input id="codeInp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+    <button class="linkbtn" id="resendBtn">Send a new code</button><button class="linkbtn" id="changeBtn">Use a different email</button>
+  </div>
+  <div id="stPick" hidden><div class="small">Choose the conversation to open:</div><div id="pickList"></div></div>
+  <div class="autherr" id="authErr"></div>
+  <div class="acts"><button class="btn" id="cancelBtn">Cancel</button><button class="btn pri" id="authGo">Send code</button></div>
 </div></div>
 
 <script>
 const $ = s => document.querySelector(s);
-const S = { sid: null, view: null, busy: false, report: null };
+const S = { sid: null, view: null, busy: false, report: null, token: null, email: '' };  // token lives in memory only: a reload needs a new code
 
 /* the 8 company-defined input parameters, in the order given in the brief.
    'objective' (the idea itself) is asked first and shown separately.        */
@@ -263,7 +322,17 @@ const LABEL = Object.fromEntries([
   ['objective','The opportunity (idea, scale, reason)'], ...EIGHT,
   ['constraints','Key constraints'], ['scope','Scope of analysis']
 ]);
-const KIND   = { fact:'Fact', assumption:'Assumption', decision:'Decision', alternative:'Alternative', gap:'Information gap' };
+const KIND   = { fact:'Fact', assumption:'Assumption', decision:'Decision', alternative:'Alternative', gap:'Information gap', suggestion:'System suggestion' };
+const REACT  = { likes:'you liked it', dislikes:'you did not like it', wants_changed:'you want it changed', unsure:'you were unsure' };
+const BASIS  = { owner_stated:'From your statements', inference:'Inferred from your statements', general_knowledge:'General knowledge' };
+const LEVEL  = { low:'Low', moderate:'Moderate', high:'High', cannot_assess:'Cannot assess' };
+const FORCES = [
+  ['threat_of_new_entrants','Threat of new entrants'],
+  ['bargaining_power_of_suppliers','Bargaining power of suppliers'],
+  ['bargaining_power_of_buyers','Bargaining power of buyers'],
+  ['threat_of_substitutes','Threat of substitutes'],
+  ['competitive_rivalry','Competitive rivalry']
+];
 const GAP    = { unknown_to_owner:'not known', not_provided:'not provided', ambiguous:'needs clarification', conflict:'conflict' };
 const STATUS = { covered:'Captured', gap:'Unknown', partial:'In progress', empty:'Not asked yet' };
 const ALTYPE = { product:'Different product', technology_variant:'Technology variant', derivative:'Derivative',
@@ -287,7 +356,7 @@ const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'
 const inline = s => s
   .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
   .replace(/(^|\s)_(.+?)_(?=\s|$|[.,)])/g, '$1<i>$2</i>')
-  .replace(/\[([FAGDL]\d+)\]/g, '<span class="tag">$1</span>');
+  .replace(/\[([FAGDLS]\d+)\]/g, '<span class="tag">$1</span>');
 function md(text){
   let html = '', list = false, para = [];
   const flush = () => { if (para.length) { html += '<p>' + para.join('<br>') + '</p>'; para = []; } };
@@ -298,11 +367,19 @@ function md(text){
   flush(); if (list) html += '</ul>';
   return html;
 }
-async function api(method, url, body){
-  const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined });
+/* bearer: undefined = use the conversation token for /api/session/... calls; null = send none; string = that token/ticket */
+async function api(method, url, body, bearer){
+  const headers = {'Content-Type':'application/json'};
+  if (bearer === undefined && S.token && url.startsWith('/api/session/')) bearer = S.token;
+  if (bearer) headers['Authorization'] = 'Bearer ' + bearer;
+  const r = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
   let data = null;
   try { data = await r.json(); } catch (e) { /* empty body */ }
-  if (!r.ok) { const e = new Error((data && data.detail) || ('Server error ' + r.status)); e.status = r.status; throw e; }
+  if (!r.ok) {
+    const e = new Error((data && data.detail) || ('Server error ' + r.status)); e.status = r.status;
+    if (r.status === 401 && bearer && bearer === S.token) sessionLost();   // the conversation token expired or is invalid
+    throw e;
+  }
   return data;
 }
 const scrollDown = () => { const s = $('#scroll'); s.scrollTop = s.scrollHeight; };
@@ -314,14 +391,48 @@ function saveBlob(obj, name){
   a.download = name; a.click(); URL.revokeObjectURL(a.href);
 }
 
+/* a path offered by the assistant is drawn as its own card; everything else is plain markdown */
+function botHtml(text){
+  const blocks = String(text).split('\n\n');
+  const hasPaths = blocks.some(b => /^\*\*Path \d/.test(b));
+  const lastQ = blocks.length - 1;
+  return blocks.map((b, k) => {
+    const m = /^\*\*Path (\d+)/.exec(b);
+    if (m) return '<div class="pathcard" data-n="' + m[1] + '"><span class="pathtag">Possible path &middot; system suggestion, not verified</span>' + md(b) + '</div>';
+    /* the single closing question of a reply gets its own visual line */
+    if (k === lastQ && k > 0 && /\?\s*$/.test(b) && !/^[_*-]/.test(b)) return '<div class="askline">' + esc(b) + '</div>';
+    return md(b);
+  }).join('');
+}
+/* quick reactions: they only start the owner's sentence in the box; the owner finishes it in their own words */
+const REACTS = [['I like this one', 'I like this one'], ['Not for me', 'this is not for me'], ['Change something', 'I would change']];
+function addPathActions(row){
+  document.querySelectorAll('.pathact').forEach(x => x.remove());          /* only the newest paths are reactable */
+  row.querySelectorAll('.pathcard').forEach(card => {
+    const n = card.dataset.n, bar = document.createElement('div'); bar.className = 'pathact';
+    REACTS.forEach(r => { const b = document.createElement('button'); b.textContent = r[0];
+      b.onclick = () => { const t = $('#inp'); t.value = 'Path ' + n + ': ' + r[1] + ' - '; autosize(); t.focus(); }; bar.appendChild(b); });
+    card.appendChild(bar);
+  });
+}
+/* extra detail for a system suggestion in the captured-state panel */
+function sugg(i){
+  if (i.kind !== 'suggestion') return '';
+  const rx = i.reaction ? '<span class="rx ' + i.reaction + '">' + (REACT[i.reaction] || i.reaction) + '</span>'
+                        : '<span class="rx">no reaction yet</span>';
+  return rx + '<span class="sg"><b>Pros:</b> ' + esc((i.pros || []).join('; ')) + '</span><span class="sg"><b>Cons:</b> ' + esc((i.cons || []).join('; ')) + '</span>';
+}
+
 /* ---------------- messages ---------------- */
 function addMsg(role, text, cls){
   const row = document.createElement('div');
   row.className = 'row ' + (role === 'owner' ? 'me' : 'bot') + (cls ? ' ' + cls : '');
   row.innerHTML = role === 'owner'
     ? '<div class="bub">' + esc(text) + '</div>'
-    : '<div class="av">TG</div><div class="bub">' + md(text) + '</div>';
-  $('#msgs').appendChild(row); scrollDown(); return row;
+    : '<div class="av">TG</div><div class="bub">' + botHtml(text) + '</div>';
+  $('#msgs').appendChild(row);
+  if (role !== 'owner' && !cls && row.querySelector('.pathcard')) addPathActions(row);
+  scrollDown(); return row;
 }
 function typing(){
   const row = document.createElement('div'); row.className = 'row bot'; row.id = 'typing';
@@ -344,17 +455,17 @@ function doneCard(){
 
 /* ---------------- welcome ---------------- */
 function welcome(){
-  S.sid = null; S.view = null; S.report = null; localStorage.removeItem('tg_sid');
+  S.sid = null; S.view = null; S.report = null; S.token = null; localStorage.removeItem('tg_sid');  /* tg_sid: key from the pre-login version */
   closeReport();
   $('#msgs').innerHTML =
     '<div class="welcome">' +
     '<h1>Before you commit capital.</h1>' +
-    '<p class="lede">I get to know you and your manufacturing idea, evaluate it on evidence, challenge it, ' +
-    'and look for opportunities that may fit you better.</p>' +
-    '<div class="flow"><div><b>1</b> Intake conversation</div><div><b>2</b> Evaluation</div><div><b>3</b> Report &amp; alternatives</div></div>' +
-    '<div class="grid8">' + EIGHT.map((e, i) => '<div><b>' + (i + 1) + '</b>' + e[1] + '</div>').join('') + '</div>' +
-    '<button class="btn pri" id="wStart">Start intake conversation</button></div>';
-  $('#wStart').onclick = openModal;
+    '<p class="lede">Tell me about your idea in your own words. I will play it back, put a few possible paths on the table, ' +
+    'and you tell me what you think. Later stages test it on evidence and look for opportunities that may fit you better.</p>' +
+    '<div class="flow"><div><b>1</b> Describe your idea</div><div><b>2</b> React to possible paths</div><div><b>3</b> Confirm &amp; get your report</div></div>' +
+    '<button class="btn pri" id="wStart">Start intake conversation</button> ' +
+    '<button class="btn" id="wOpen">Open an existing conversation</button></div>';
+  $('#wStart').onclick = openModal; $('#wOpen').onclick = () => startAuth('open');
   $('#comp').style.display = 'none'; $('#seg').style.visibility = 'hidden'; $('#reportBtn').style.display = 'none';
   $('#title').textContent = 'TG Opportunity Finder'; $('#sub').textContent = 'Intake conversation';
   renderPanel(null); loadSessions();
@@ -375,16 +486,18 @@ function renderPanel(v){
     '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
     '<div class="small">' + done + ' of ' + total + ' areas covered or recorded as unknown</div>' +
     '<div style="height:10px"></div>' + row('objective', LABEL.objective, '&#9733;') +
-    '<div class="small" style="margin:13px 0 2px">The 8 input parameters</div>' +
+    '<div class="small" style="margin:13px 0 2px">Internal checklist &mdash; it fills up from the conversation; the owner is never asked to fill it in</div>' +
     EIGHT.map((e, i) => row(e[0], e[1], i + 1)).join('') +
     '<div class="callout">&ldquo;Unknown&rdquo; means you said you do not know, or it was not provided. ' +
     'It is recorded honestly as an information gap and never guessed.</div>';
 
   const groups = ['objective', ...EIGHT.map(e => e[0]), 'constraints', 'scope'];
   const items = v ? v.items : [];
+  const mine = items.filter(i => i.kind !== 'suggestion'), paths = items.filter(i => i.kind === 'suggestion');
   let html = '';
+  if (mine.length) html += '<div class="who">In your own words</div>';
   for (const g of groups) {
-    const list = items.filter(i => i.param === g);
+    const list = mine.filter(i => i.param === g);
     if (!list.length) continue;
     html += '<div class="grp"><h5>' + LABEL[g] + '</h5>' + list.map(i =>
       '<div class="it ' + i.kind + '"><em>' + KIND[i.kind] +
@@ -392,13 +505,15 @@ function renderPanel(v){
       (i.origin === 'system' ? ' <span class="small">(assumed by the system &mdash; please confirm)</span>' : '') +
       ' <span class="tag">' + i.id + '</span></div>').join('') + '</div>';
   }
+  if (paths.length) html += '<div class="who sys">Suggested by the system &mdash; not your view</div><div class="grp">' + paths.map(i =>
+      '<div class="it suggestion"><em>Path</em>' + esc(i.statement) + sugg(i) + ' <span class="tag">' + i.id + '</span></div>').join('') + '</div>';
   $('#p-cap').innerHTML = html ||
     '<div class="small">Nothing captured yet. Facts, assumptions, decisions, alternatives and information gaps ' +
     'appear here as you answer &mdash; each one tied to your own words.</div>';
 
   const phase = v ? v.phase : '';
   const stages = [
-    ['Intake conversation','The 8 parameters, your idea, constraints and scope', phase === 'complete' ? 2 : 1],
+    ['Intake conversation','Your idea in your own words, the paths I suggest, your reactions, constraints and scope', phase === 'complete' ? 2 : 1],
     ['Shared project state','Facts, assumptions, decisions, alternatives, gaps, evidence', phase === 'complete' ? 2 : 0],
     ['Evaluation','Market, technology, raw materials, competition, CAPEX, operating economics, financing, risk, strategic fit', S.report ? 2 : (phase === 'complete' ? 1 : 0)],
     ['Challenge &amp; alternatives','Better products, technologies, derivatives, upstream / downstream, adjacent businesses', S.report ? 2 : 0],
@@ -411,14 +526,14 @@ function renderPanel(v){
     '<div class="callout">The report is written only from what you confirmed at intake. Anything it could not ground ' +
     'in your statements is listed as an assumption or an information gap.</div>';
 }
-document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+document.querySelectorAll('#tabs button[data-t]').forEach(b => b.onclick = () => {
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.t));
 });
 
 /* ---------------- state -> UI ---------------- */
 function applyView(v){
-  S.view = v; S.sid = v.session_id; localStorage.setItem('tg_sid', S.sid);
+  S.view = v; S.sid = v.session_id; remember(v);
   $('#title').textContent = v.owner_name ? 'Intake with ' + v.owner_name : 'Intake conversation';
   $('#sub').textContent = 'Session ' + v.session_id + ' \u00b7 ' + v.phase.replace(/_/g, ' ');
   document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.m === v.mode));
@@ -426,6 +541,8 @@ function applyView(v){
   $('#comp').style.display = '';
   $('#reportBtn').style.display = v.phase === 'complete' ? '' : 'none';
   renderPanel(v); renderChips();
+  $('#inp').placeholder = v.phase !== 'intake' ? 'Reply, or tell me what to change...'
+    : (v.paths_offered ? 'React, correct me, add what you feel, or ask me anything...' : 'Describe your idea in your own words...');
 }
 function renderChips(){
   const c = $('#chips'); c.innerHTML = ''; const v = S.view; if (!v) return;
@@ -438,7 +555,7 @@ function renderChips(){
     b.textContent = 'Open evaluation report'; b.onclick = () => openReport(!S.report); c.appendChild(b);
     add('I want to add something else');
   } else {
-    add("I don't know"); add('Skip this one'); add('Why do you ask this?'); add('What does that mean?');
+    /* no canned answers: the owner replies in their own words */
   }
 }
 
@@ -471,34 +588,115 @@ async function downloadHandoff(){
   try { saveBlob(await api('GET', '/api/session/' + S.sid + '/handoff'), 'tg-intake-' + S.sid + '.json'); }
   catch (e) { alert('Could not download the hand-off: ' + e.message); }
 }
-async function openSession(id){
+/* ---------------- e-mail verification ----------------
+   new conversation : e-mail -> code -> ticket -> conversation is created for that e-mail
+   open conversation: e-mail -> code -> ticket -> pick one of that e-mail's conversations -> conversation token
+   Every open or start needs its own code; the ticket is single use and the token stays in memory only.      */
+const A = { intent: null, stage: 'email', email: '', challenge: null, ticket: null, sid: null };
+const RECENT = 'tg_recent';
+function recents(){ try { return JSON.parse(sessionStorage.getItem(RECENT) || '[]'); } catch (e) { return []; } }
+function remember(v){   /* only ids and labels, never a token: reopening a conversation always needs a fresh code */
+  if (!S.email) return;
   try {
-    const v = await api('GET', '/api/session/' + id);
-    $('#msgs').innerHTML = '';
-    for (const t of v.transcript) addMsg(t.role, t.text);
-    S.report = null; applyView(v);
-    if (v.phase === 'complete') { doneCard(); loadReportIfAny(); }
-    closeDrawers(); loadSessions();
-  } catch (e) { welcome(); }
+    const list = recents().filter(x => x.id !== v.session_id);
+    list.unshift({ id: v.session_id, owner: v.owner_name, phase: v.phase, mode: v.mode, email: S.email, at: new Date().toISOString() });
+    sessionStorage.setItem(RECENT, JSON.stringify(list.slice(0, 20)));
+  } catch (e) { /* the recent list is optional */ }
 }
-async function newSession(){
-  const name = $('#nameInp').value.trim(); closeModal();
-  try {
-    const v = await api('POST', '/api/session', { owner_name: name });
-    $('#msgs').innerHTML = ''; S.report = null; closeReport();
-    addMsg('assistant', v.reply); applyView(v); closeDrawers(); loadSessions(); $('#inp').focus();
-  } catch (e) { alert('Could not start the session: ' + e.message); }
+function authError(msg){ const e = $('#authErr'); e.textContent = msg || ''; e.style.display = msg ? 'block' : 'none'; }
+function authBusy(on){ $('#authGo').disabled = on; $('#resendBtn').disabled = on; $('#changeBtn').disabled = on; }
+function showStage(stage){
+  A.stage = stage;
+  $('#stEmail').hidden = stage !== 'email';
+  $('#nameRow').hidden = A.intent !== 'new';
+  $('#stCode').hidden = stage !== 'code';
+  $('#stPick').hidden = stage !== 'pick';
+  $('#authGo').hidden = stage === 'pick';
+  $('#authGo').textContent = stage === 'email' ? 'Send code' : 'Verify';
+  authError('');
+  setTimeout(() => { const f = stage === 'email' ? $('#emailInp') : stage === 'code' ? $('#codeInp') : null; if (f) f.focus(); }, 30);
 }
-async function loadSessions(){
+function startAuth(intent, opts){
+  opts = opts || {};
+  A.intent = intent; A.challenge = null; A.ticket = null; A.sid = opts.sid || null;
+  $('#authTitle').textContent = intent === 'new' ? 'New intake conversation' : 'Open an existing conversation';
+  $('#authHelp').textContent = opts.notice || (intent === 'new'
+    ? 'We will email a 6-digit code to verify your address before the conversation starts.'
+    : 'Enter the email this conversation belongs to. We will send a 6-digit code to verify it is you.');
+  $('#emailInp').value = opts.email || ''; $('#nameInp').value = ''; $('#codeInp').value = ''; $('#pickList').innerHTML = '';
+  authBusy(false); showStage('email');
+  $('#modal').classList.add('on');
+}
+async function sendCode(){
+  const email = $('#emailInp').value.trim();
+  if (!email) return authError('Enter your email address.');
+  authBusy(true);
   try {
-    const list = await api('GET', '/api/sessions');
-    $('#sessions').innerHTML = list.map(s =>
-      '<button class="sess' + (s.id === S.sid ? ' on' : '') + '" data-id="' + s.id + '"><b>' +
-      esc(s.owner || 'Untitled intake') + '</b><span>' + s.mode + ' &middot; ' +
-      s.phase.replace(/_/g,' ') + ' &middot; ' + ago(s.updated) + '</span></button>').join('') ||
-      '<div class="small" style="padding:8px 10px">No conversations yet.</div>';
-    document.querySelectorAll('.sess').forEach(b => b.onclick = () => openSession(b.dataset.id));
-  } catch (e) { /* the sidebar is optional */ }
+    const r = await api('POST', '/api/auth/request-code', { email, intent: A.intent }, null);
+    A.email = email.toLowerCase(); A.challenge = r.challenge_id;
+    $('#codeHelp').textContent = 'We emailed a 6-digit code to ' + A.email + '. It expires in ' +
+      Math.round(r.expires_in / 60) + ' minutes and works once. Check your spam folder if it does not arrive.';
+    $('#codeInp').value = ''; showStage('code');
+  } catch (e) { authError(e.message); }
+  authBusy(false);
+}
+async function verifyCode(){
+  const code = $('#codeInp').value.trim();
+  if (!/^\d{6}$/.test(code)) return authError('Enter the 6-digit code from the email.');
+  authBusy(true);
+  try {
+    const r = await api('POST', '/api/auth/verify-code', { challenge_id: A.challenge, code }, null);
+    A.ticket = r.ticket;
+    if (A.intent === 'new') await createConversation(); else await showPick();
+  } catch (e) { authError(e.message); }
+  authBusy(false);
+}
+async function createConversation(){
+  const v = await api('POST', '/api/session', { owner_name: $('#nameInp').value.trim() }, A.ticket);
+  S.token = v.token; S.email = A.email; A.ticket = null;
+  closeModal();
+  $('#msgs').innerHTML = ''; S.report = null; closeReport();
+  addMsg('assistant', v.reply); applyView(v); closeDrawers(); loadSessions(); $('#inp').focus();
+}
+async function showPick(){
+  const list = await api('GET', '/api/auth/conversations', null, A.ticket);
+  if (A.sid && list.some(c => c.id === A.sid)) return openChosen(A.sid);   // reopening a specific one: no need to pick
+  $('#pickList').innerHTML = list.length
+    ? list.map(c => '<button class="sess" data-id="' + esc(c.id) + '"><b>' + esc(c.owner || 'Untitled intake') + '</b><span>' +
+        esc(c.mode) + ' &middot; ' + esc(c.phase.replace(/_/g, ' ')) + ' &middot; ' + ago(c.updated) + '</span></button>').join('')
+    : '<div class="small">No conversations were found for ' + esc(A.email) + '. Close this window and start a new conversation instead.</div>';
+  $('#pickList').querySelectorAll('.sess').forEach(b => b.onclick = () => choose(b.dataset.id));
+  showStage('pick');
+}
+async function choose(id){ authBusy(true); try { await openChosen(id); } catch (e) { authError(e.message); } authBusy(false); }
+async function openChosen(id){
+  const r = await api('POST', '/api/auth/open', { session_id: id }, A.ticket);
+  S.token = r.token; S.email = A.email; A.ticket = null;
+  const v = await api('GET', '/api/session/' + id);            // the conversation token is attached automatically
+  closeModal();
+  $('#msgs').innerHTML = '';
+  for (const t of v.transcript) addMsg(t.role, t.text);
+  S.report = null; applyView(v);
+  if (v.phase === 'complete') { doneCard(); loadReportIfAny(); }
+  closeDrawers(); loadSessions();
+}
+function sessionLost(){
+  const sid = S.sid, email = S.email;
+  S.token = null;
+  startAuth('open', { email, sid, notice: 'Your verification has expired. Verify your email again to continue this conversation.' });
+}
+function loadSessions(){
+  const list = recents();
+  $('#sessions').innerHTML = list.map(s =>
+    '<button class="sess' + (s.id === S.sid ? ' on' : '') + '" data-id="' + esc(s.id) + '"><b>' +
+    esc(s.owner || 'Untitled intake') + '</b><span>' + esc(s.mode) + ' &middot; ' +
+    esc(String(s.phase).replace(/_/g, ' ')) + ' &middot; ' + ago(s.at) + '</span></button>').join('') ||
+    '<div class="small" style="padding:8px 10px">Nothing yet. Conversations you verify in this tab are listed here; reopening one needs a new code.</div>';
+  document.querySelectorAll('#sessions .sess').forEach(b => b.onclick = () => {
+    if (b.dataset.id === S.sid && S.token) { closeDrawers(); return; }   // already open and verified
+    const r = recents().find(x => x.id === b.dataset.id);
+    startAuth('open', { email: r ? r.email : '', sid: b.dataset.id, notice: 'Verify your email to reopen this conversation.' });
+  });
 }
 
 /* ---------------- opportunity evaluation report ---------------- */
@@ -531,35 +729,58 @@ async function openReport(generate){
   }
 }
 function para(t){ return '<p>' + esc(t || '').replace(/\n/g, '<br>') + '</p>'; }
+const idTags = ids => (ids || []).map(x => '<span class="tag">' + esc(x) + '</span>').join(' ');
+const meta = (basis, ids) => '<div class="ptmeta"><span class="basis">' + esc(BASIS[basis] || basis || '') + '</span>' + idTags(ids) + '</div>';
+function swotHtml(r, H){
+  if (!r.swot) return '';
+  const Q = [['strengths','Strengths','Internal'],['weaknesses','Weaknesses','Internal'],['opportunities','Opportunities','External'],['threats','Threats','External']];
+  return H('SWOT analysis') +
+    '<p class="small" style="margin:0 0 8px">A standard strategic-management tool. Strengths and weaknesses are about you and the venture; ' +
+    'opportunities and threats are about the outside world. Each point shows what it rests on.</p>' +
+    '<div class="swot">' + Q.map(q => '<div class="quad"><h3>' + q[1] + '</h3><div class="scope">' + q[2] + '</div>' +
+      (r.swot[q[0]] || []).map(p => '<div class="pt">' + esc(p.point) + meta(p.basis, p.source_ids) + '</div>').join('') + '</div>').join('') + '</div>';
+}
+function forcesHtml(r, H){
+  const f = r.porters_five_forces;
+  if (!f) return '';
+  return H("Porter's Five Forces") +
+    '<p class="small" style="margin:0 0 8px">A standard tool for judging how competitive and profitable the industry you would enter is. Qualitative, with no invented figures.</p>' +
+    FORCES.map(k => { const a = f[k[0]] || {};
+      return '<div class="force"><h3>' + k[1] + ' <span class="lvl ' + esc(a.intensity || '') + '">' + esc(LEVEL[a.intensity] || a.intensity || '') + '</span></h3>' +
+             para(a.reasoning) + meta(a.basis, a.source_ids) + '</div>'; }).join('') +
+    '<div class="rsec"><h3>What the five forces mean for you</h3>' + para(f.overall_takeaway) + '</div>';
+}
 function renderReport(r){
   const scroll = document.querySelector('.reportScroll');
   const owner = S.view && S.view.owner_name ? ' for ' + S.view.owner_name : '';
+  let n = 0; const H = t => '<h2>' + (++n) + ' &middot; ' + t + '</h2>';
   let h = '<div class="rcol" id="reportBody">';
 
   h += '<div class="rhead">Opportunity Evaluation Report' + esc(owner) + '</div>';
   h += '<p class="rlede">' + esc(r.idea_summary || '') + '</p>';
   h += '<div class="rnote">Evidence-based, but not independently verified. Every statement is built from what you ' +
-       'stated at intake plus the assumptions listed below. Check the assumptions before you commit capital.</div>';
+       'stated at intake plus the assumptions listed below. This trial uses two generic strategic-management tools, SWOT and Porter\'s Five Forces. Check the assumptions before you commit capital.</div>';
 
-  h += '<h2>1 &middot; Analysis</h2>';
+  h += swotHtml(r, H) + forcesHtml(r, H);
+  h += H('Analysis');
   h += SECTIONS.map((s, i) => '<div class="rsec"><h3><i>' + (i + 1) + '</i>' + s[1] + ' <span class="small" style="font-weight:400">&mdash; ' + s[2] + '</span></h3>' + para(r[s[0]]) + '</div>').join('');
 
-  h += '<h2>2 &middot; Assumptions this report relies on</h2>';
+  h += H('Assumptions this report relies on');
   h += (r.assumptions && r.assumptions.length)
     ? '<ul class="rlist">' + r.assumptions.map(a => '<li>' + esc(a) + '</li>').join('') + '</ul>'
     : '<div class="small">No assumptions were recorded.</div>';
 
-  h += '<h2>3 &middot; Findings</h2>';
+  h += H('Findings');
   h += (r.findings && r.findings.length)
     ? '<ul class="rlist findings">' + r.findings.map(f => '<li>' + esc(f) + '</li>').join('') + '</ul>'
     : '<div class="small">No findings were recorded.</div>';
 
-  h += '<h2>4 &middot; Recommendations</h2>';
+  h += H('Recommendations');
   h += (r.recommendations && r.recommendations.length)
     ? '<ul class="rlist reco">' + r.recommendations.map((c, i) => '<li><b>' + (i + 1) + '.</b> ' + esc(c) + '</li>').join('') + '</ul>'
     : '<div class="small">No recommendations were recorded.</div>';
 
-  h += '<h2>5 &middot; Alternative opportunities to consider</h2>';
+  h += H('Alternative opportunities to consider');
   h += '<p class="small" style="margin:0 0 8px">Your original idea, challenged. These are products, technology ' +
        'variants, derivatives, upstream / downstream steps and adjacent businesses that may fit your own strengths, ' +
        'capabilities, feedstock, customers and geography better.</p>';
@@ -575,30 +796,38 @@ function renderReport(r){
 }
 
 /* ---------------- wiring ---------------- */
-const openModal  = () => { $('#modal').classList.add('on'); $('#nameInp').value = ''; setTimeout(() => $('#nameInp').focus(), 30); };
-const closeModal = () => $('#modal').classList.remove('on');
-const closeDrawers = () => { $('#side').classList.remove('open'); $('#right').classList.remove('open'); };
+const openModal  = () => startAuth('new');
+const closeModal = () => { $('#modal').classList.remove('on'); A.ticket = null; };
+const syncScrim = () => document.body.classList.toggle('drawer', $('#side').classList.contains('open') || $('#right').classList.contains('open'));
+const closeDrawers = () => { $('#side').classList.remove('open'); $('#right').classList.remove('open'); syncScrim(); };
 function autosize(){ const t = $('#inp'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 170) + 'px'; }
 
-$('#newBtn').onclick = openModal;
-$('#startBtn').onclick = newSession;
+$('#newBtn').onclick = () => startAuth('new');
+$('#openBtn').onclick = () => startAuth('open');
 $('#cancelBtn').onclick = closeModal;
-$('#nameInp').onkeydown = e => { if (e.key === 'Enter') newSession(); };
+$('#authGo').onclick = () => A.stage === 'email' ? sendCode() : verifyCode();
+$('#resendBtn').onclick = sendCode;
+$('#changeBtn').onclick = () => showStage('email');
+$('#emailInp').onkeydown = e => { if (e.key === 'Enter') sendCode(); };
+$('#nameInp').onkeydown = e => { if (e.key === 'Enter') $('#emailInp').focus(); };
+$('#codeInp').onkeydown = e => { if (e.key === 'Enter') verifyCode(); };
+$('#codeInp').oninput = e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); };
 $('#sendBtn').onclick = () => send($('#inp').value);
 $('#inp').oninput = autosize;
 $('#inp').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send($('#inp').value); } };
 document.querySelectorAll('#seg button').forEach(b => b.onclick = () => setMode(b.dataset.m));
-$('#menuBtn').onclick = () => $('#side').classList.toggle('open');
-$('#panelBtn').onclick = () => $('#right').classList.toggle('open');
+$('#menuBtn').onclick = () => { $('#side').classList.toggle('open'); syncScrim(); };
+$('#panelBtn').onclick = () => { $('#right').classList.toggle('open'); syncScrim(); };
+$('#closePanel').onclick = e => { e.stopPropagation(); closeDrawers(); };
+$('#scrim').onclick = closeDrawers;
 $('#reportBtn').onclick = () => openReport(false);
 $('#backBtn').onclick = closeReport;
 $('#printBtn').onclick = () => window.print();
 $('#rdlBtn').onclick = () => { if (S.report) saveBlob(S.report, 'tg-report-' + S.sid + '.json'); };
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
-document.onkeydown = e => { if (e.key === 'Escape') { closeModal(); closeReport(); } };
+document.onkeydown = e => { if (e.key === 'Escape') { closeModal(); closeReport(); closeDrawers(); } };
 
-const saved = localStorage.getItem('tg_sid');
-if (saved) openSession(saved); else welcome();
+welcome();   // no auto-resume: opening any conversation needs an emailed code
 </script>
 </body>
 </html>

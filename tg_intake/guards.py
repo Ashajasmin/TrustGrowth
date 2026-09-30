@@ -51,3 +51,24 @@ def redact_sentences_with(text: str, bad: set[str]) -> str:
     sentences = re.split(r"(?<=[.!?])\s+", text)
     keep = [s for s in sentences if not (numbers(s) & bad)]
     return " ".join(keep).strip()
+
+
+# ---------------------------------------------------------------- shape ---
+# Conversation-shape rules: at most one question per reply, and it may live only
+# in the dedicated `question` field.
+def question_marks(text: str) -> int:
+    return (text or "").count("?")
+
+
+def strip_question_sentences(text: str) -> str:
+    """Remove every sentence that ends in a question mark (only removes, never adds)."""
+    sentences = re.split(r"(?<=[.!?])\s+", text or "")
+    return " ".join(s for s in sentences if not s.rstrip().endswith("?")).strip()
+
+
+def first_question(text: str) -> str:
+    """Keep only the first question sentence of a text ("" if it has none)."""
+    for s in re.split(r"(?<=[.!?])\s+", text or ""):
+        if s.rstrip().endswith("?"):
+            return s.strip()
+    return (text or "").strip() if "?" not in (text or "") else ""

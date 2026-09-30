@@ -1,7 +1,11 @@
 """Intake framework: the 8 company-defined input parameters, the three depth
 modes (Brief / Balanced / Detailed), the pyramid ordering, coverage and the
-"what do we ask next" planner. All of this is plain code - NOT left to the LLM -
-so completeness is decided deterministically."""
+"what could we ask next" planner. All of this is plain code - NOT left to the LLM -
+so completeness is decided deterministically.
+
+The 8 parameters are a HIDDEN CHECKLIST: they fill up from whatever the owner says
+in free conversation. The planner only decides which open item is worth working
+into the next reply (at most one question); it never turns the chat into a form."""
 from dataclasses import dataclass
 
 from .schema import ProjectState
@@ -12,7 +16,7 @@ class ParamSpec:
     key: str
     label: str
     level: int  # pyramid level: 1 = essentials first, 2 = who/what you bring, 3 = appetite & ambition
-    question: str  # default question (used if the LLM gives none)
+    question: str  # what the item is about, phrased as a question (a hint for the model - never sent to the owner verbatim)
     checklist: tuple  # aspects to probe in Detailed mode (prompts, not facts)
 
 
@@ -74,17 +78,17 @@ class ModeConfig:
 
 MODES = {
     "brief": ModeConfig(1, 2, False, False, False,
-        "BRIEF: minimum information first. Accept short answers, one question per turn, do not probe for detail."),
+        "LIGHT: essentials only. Accept short answers and do not probe for detail."),
     "balanced": ModeConfig(1, 3, True, True, True,
-        "BALANCED: one main question per turn; follow up once when an answer is vague or misses something important."),
+        "BALANCED (default): follow up once when an answer is vague or misses something important."),
     "detailed": ModeConfig(2, 3, True, True, True,
-        "DETAILED: probe each topic in depth using its checklist; ask for specifics (quantities, units, names, dates)."),
+        "THOROUGH: probe each topic in more depth using its aspects; ask for specifics (units, names, dates) when they matter."),
 }
 
 
 @dataclass
 class Focus:
-    kind: str  # param | clarify | constraints | scope | recap | await_confirm
+    kind: str  # param | clarify | constraints | scope | recap | await_confirm  (what is worth asking about next)
     key: str
     param: str = ""
     item_id: str = ""
@@ -100,7 +104,8 @@ def param_status(st: ProjectState, key: str) -> str:
         return "covered"
     if any(g.gap_type in ("unknown_to_owner", "not_provided") for g in st.active("gap", key)):
         return "gap"
-    return "partial" if st.active(param=key) else "empty"
+    owner_side = [i for i in st.active(param=key) if i.kind != "suggestion"]
+    return "partial" if owner_side else "empty"
 
 
 def coverage(st: ProjectState) -> dict:
@@ -145,19 +150,6 @@ def plan_next(st: ProjectState) -> Focus:
     return Focus("recap", "recap")
 
 
-def default_question(focus: Focus, st: ProjectState) -> str:
-    if focus.kind == "param":
-        return SPEC_BY_KEY[focus.key].question
-    if focus.kind == "clarify":
-        item = st.get(focus.item_id)
-        return f"Could you clarify this for me: {item.statement if item else 'your last point'}?"
-    if focus.kind == "constraints":
-        return CONSTRAINTS_QUESTION
-    if focus.kind == "scope":
-        return SCOPE_QUESTION
-    return ""
-
-
 # ----------------------------------------------------------------------------
 # Recap (built from stored items only - the LLM does not write it)
 # ----------------------------------------------------------------------------
@@ -168,6 +160,13 @@ _GAP_LABEL = {
     "conflict": "[!] Conflict",
 }
 _KIND_TAG = {"fact": "", "assumption": "Assumption: ", "decision": "Decision: ", "alternative": "Alternative considered: "}
+_REACTION_LABEL = {
+    "likes": "you liked it",
+    "dislikes": "you did not like it",
+    "wants_changed": "you want it changed",
+    "unsure": "you were unsure",
+    "": "no reaction from you yet",
+}
 
 
 def _line(i) -> str:
@@ -183,9 +182,14 @@ def render_recap(st: ProjectState) -> str:
         "",
     ]
     for key in [s.key for s in SPECS] + ["constraints", "scope"]:
-        items = st.active(param=key)
+        items = [i for i in st.active(param=key) if i.kind != "suggestion"]
         out.append(f"**{label_of(key)}**")
         out.extend(_line(i) for i in items) if items else out.append("- (nothing captured)")
+        out.append("")
+    paths = st.active("suggestion")
+    if paths:
+        out.append("**Paths I suggested** _(my suggestions, not statements of yours)_")
+        out.extend(f"- {p.statement} - {_REACTION_LABEL.get(p.reaction, p.reaction)} [{p.id}]" for p in paths)
         out.append("")
     out.append('Please reply **confirm** if this is right, or tell me what to change or add.')
     return "\n".join(out)

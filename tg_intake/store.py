@@ -1,6 +1,8 @@
 """Persistent memory. One JSON file per session (full Shared Project State +
 transcript + audit log) and, when the owner confirms, a hand-off file for the
 next stages. Writes are atomic (temp file, then rename)."""
+import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -8,6 +10,7 @@ from pathlib import Path
 from . import framework as fw
 from .schema import OpportunityReport, ProjectState, now
 
+log = logging.getLogger("tg.store")
 _SID = re.compile(r"[a-f0-9]{6,32}")
 
 VERIFICATION_NOTE = (
@@ -23,11 +26,28 @@ def _row(i) -> dict:
     }
 
 
+SUGGESTION_NOTE = (
+    "System suggestions are paths the intake assistant put forward. They are NOT owner statements and NOT evidence "
+    "about the owner. Only 'owner_reaction' and 'owner_reaction_quotes' record what the owner said about them."
+)
+
+
+def _suggestion_row(i) -> dict:
+    return {
+        "id": i.id, "name": i.attribute, "statement": i.statement, "origin": "system",
+        "pros": i.pros, "cons": i.cons, "status": i.status,
+        "owner_reaction": i.reaction or None,
+        "owner_reaction_quotes": [
+            {"turn": e.turn, "quote": e.quote} for e in i.evidence if e.source_type == "owner_statement"
+        ],
+    }
+
+
 def build_handoff(st: ProjectState) -> dict:
-    act = st.active()
+    act = [i for i in st.active() if i.kind != "suggestion"]  # owner-side items only
     by = lambda kind: [_row(i) for i in act if i.kind == kind]  # noqa: E731
     return {
-        "schema": "tg-opportunity-finder/intake-handoff/v1",
+        "schema": "tg-opportunity-finder/intake-handoff/v2",
         "session_id": st.session_id,
         "owner_name": st.owner_name,
         "mode": st.mode,
@@ -44,9 +64,13 @@ def build_handoff(st: ProjectState) -> dict:
                 {"item_id": i.id, "source_type": e.source_type, "turn": e.turn, "quote": e.quote}
                 for i in act for e in i.evidence
             ],
+            "system_suggestions": {
+                "note": SUGGESTION_NOTE,
+                "paths": [_suggestion_row(i) for i in st.items if i.kind == "suggestion"],
+            },
         },
         "parameters": {
-            k: {"status": fw.param_status(st, k), "items": [_row(i) for i in st.active(param=k)]}
+            k: {"status": fw.param_status(st, k), "items": [_row(i) for i in act if i.param == k]}
             for k in fw.ORDER + ["constraints", "scope"]
         },
         "owner_questions_for_analysis": [
@@ -84,6 +108,21 @@ class JsonStore:
         out = []
         for p in sorted((self.root / "sessions").glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
             st = ProjectState.model_validate_json(p.read_text(encoding="utf-8"))
+            out.append({"id": st.session_id, "owner": st.owner_name, "mode": st.mode, "phase": st.phase, "updated": st.updated_at})
+        return out
+
+    def list_for_email(self, email: str) -> list[dict]:
+        """Conversations owned by this (already verified) e-mail address, newest first."""
+        out = []
+        for p in sorted((self.root / "sessions").glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+            try:
+                raw = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                log.warning("skipping unreadable session file %s", p.name)
+                continue
+            if str(raw.get("owner_email", "")).strip().lower() != email:
+                continue
+            st = ProjectState.model_validate(raw)
             out.append({"id": st.session_id, "owner": st.owner_name, "mode": st.mode, "phase": st.phase, "updated": st.updated_at})
         return out
 

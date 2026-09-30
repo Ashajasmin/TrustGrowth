@@ -12,7 +12,10 @@ def now() -> str:
 
 Mode = Literal["brief", "balanced", "detailed"]
 Phase = Literal["intake", "awaiting_confirmation", "complete"]
-Kind = Literal["fact", "assumption", "decision", "alternative", "gap"]
+# 'suggestion' is created ONLY by the system (a path the assistant proposed). It is never an owner fact.
+Kind = Literal["fact", "assumption", "decision", "alternative", "gap", "suggestion"]
+OwnerKind = Literal["fact", "assumption", "decision", "alternative", "gap"]
+Stance = Literal["likes", "dislikes", "wants_changed", "unsure"]
 Param = Literal[
     "objective",
     "existing_business",
@@ -40,7 +43,7 @@ Basis = Literal[
     "intake_process", "glossary", "general_knowledge_unverified", "cannot_answer"
 ]
 
-PREFIX = {"fact": "F", "assumption": "A", "decision": "D", "alternative": "L", "gap": "G"}
+PREFIX = {"fact": "F", "assumption": "A", "decision": "D", "alternative": "L", "gap": "G", "suggestion": "S"}
 
 
 # ----------------------------------------------------------------------------
@@ -68,6 +71,9 @@ class Item(BaseModel):
     related_id: str = ""
     supersedes: str = ""
     superseded_by: str = ""
+    pros: list[str] = []  # suggestions only
+    cons: list[str] = []  # suggestions only
+    reaction: str = ""  # owner's stance on a suggestion (Stance), "" = none yet
     evidence: list[Evidence] = []
     created_turn: int = 0
     updated_at: str = ""
@@ -90,6 +96,7 @@ class Turn(BaseModel):
 class ProjectState(BaseModel):
     session_id: str
     owner_name: str = ""
+    owner_email: str = ""  # verified by a one-time code when the conversation was created; "" = no verified owner
     created_at: str = Field(default_factory=now)
     updated_at: str = Field(default_factory=now)
     mode: Mode = "balanced"
@@ -103,6 +110,9 @@ class ProjectState(BaseModel):
     focus_attempts: dict[str, int] = {}
     last_focus: str = ""
     last_bot_question: str = ""
+    path_rounds: int = 0  # how many times paths were offered
+    paths_turn: int = 0  # owner-turn number at which paths were last offered
+    last_move: str = ""  # invite | suggest | revise | converse | recap | await
     next_id: int = 1
 
     # -- helpers ------------------------------------------------------------
@@ -138,6 +148,8 @@ class ProjectState(BaseModel):
         gap_type: str = "",
         related_id: str = "",
         supersedes: str = "",
+        pros: list[str] | None = None,
+        cons: list[str] | None = None,
     ) -> Item:
         n = self.next_id
         self.next_id += 1
@@ -151,6 +163,8 @@ class ProjectState(BaseModel):
             gap_type=gap_type,
             related_id=related_id,
             supersedes=supersedes,
+            pros=pros or [],
+            cons=cons or [],
             evidence=[Evidence(source_type=source, turn=self.turn, quote=quote, at=now())],
             created_turn=self.turn,
             updated_at=now(),
@@ -164,7 +178,7 @@ class ProjectState(BaseModel):
 # always returns them; "" / [] mean "nothing".
 # ----------------------------------------------------------------------------
 class Extraction(BaseModel):
-    kind: Kind
+    kind: OwnerKind
     param: Param
     attribute: str = Field(description="1-3 word label, e.g. 'product', 'capacity', 'own funds'")
     statement: str = Field(
@@ -185,6 +199,14 @@ class Correction(BaseModel):
     source_quote: str = Field(description="Exact verbatim substring of the latest owner message.")
 
 
+class Reaction(BaseModel):
+    target_id: str = Field(description="Id (S...) of an active system suggestion the owner is reacting to.")
+    stance: Stance = Field(
+        description="likes = owner favours it; dislikes = owner rejects it; wants_changed = owner wants it altered; unsure = owner is undecided."
+    )
+    source_quote: str = Field(description="Exact verbatim substring of the latest owner message showing the reaction.")
+
+
 class TurnAnalysis(BaseModel):
     owner_intent: Intent
     requested_mode: Literal["", "brief", "balanced", "detailed"] = Field(
@@ -196,6 +218,10 @@ class TurnAnalysis(BaseModel):
     resolved_ids: list[str]
     confirmed_ids: list[str]
     owner_questions: list[str] = Field(description="Every question the owner asked. Do not answer them here.")
+    reactions: list[Reaction] = Field(
+        default_factory=list,
+        description="Owner's reactions to active system suggestions (S ids). Empty if the owner did not react to any.",
+    )
 
 
 class QAnswer(BaseModel):
@@ -204,10 +230,25 @@ class QAnswer(BaseModel):
     basis: Basis
 
 
+class PathOption(BaseModel):
+    name: str = Field(description="Short name for this possible path (3-8 words).")
+    summary: str = Field(description="One or two sentences: what this path would mean for the owner's idea.")
+    pros: list[str] = Field(description="2-3 short, qualitative advantages. No figures the owner did not give.")
+    cons: list[str] = Field(description="2-3 short, qualitative drawbacks or risks. No figures the owner did not give.")
+
+
 class ReplyDraft(BaseModel):
     answers: list[QAnswer] = Field(description="One entry per owner question; empty list if none.")
-    acknowledgement: str = Field(description="At most one short sentence; empty string allowed.")
-    question: str = Field(description="The next question for the owner, or empty string if the focus says not to ask.")
+    restatement: str = Field(
+        description="Only when the move is suggest/revise: the owner's idea restated clearly in 1-3 sentences from the state. Otherwise empty string."
+    )
+    paths: list[PathOption] = Field(
+        description="Only when the move is suggest/revise: 2-3 genuinely different possible paths. Otherwise empty list."
+    )
+    giveback: str = Field(
+        description="Only for converse/invite/recap moves: substantive non-question content (reflection, a consideration, an update). Never contains a question mark. Otherwise empty string."
+    )
+    question: str = Field(description="The single question for this reply, or empty string if the move says not to ask.")
 
 
 # ----------------------------------------------------------------------------
@@ -231,7 +272,46 @@ class AlternativeOpportunity(BaseModel):
     )
 
 
+ReportBasis = Literal["owner_stated", "general_knowledge", "inference"]
+ForceLevel = Literal["low", "moderate", "high", "cannot_assess"]
+
+
+class SwotPoint(BaseModel):
+    point: str = Field(description="One specific, plain-language point.")
+    basis: ReportBasis = Field(
+        description="owner_stated = comes from the hand-off (then source_ids is required); general_knowledge = general industry/strategy knowledge, qualitative only; inference = a reasoned implication of hand-off items (list them in source_ids)."
+    )
+    source_ids: list[str] = Field(
+        description="Ids of hand-off items (F1, G2, ...) this point rests on. Only ids that exist in the hand-off. Empty only for general_knowledge."
+    )
+
+
+class Swot(BaseModel):
+    strengths: list[SwotPoint] = []  # internal, positive - the owner's own resources
+    weaknesses: list[SwotPoint] = []  # internal, negative - what the owner lacks or has not established
+    opportunities: list[SwotPoint] = []  # external, favourable
+    threats: list[SwotPoint] = []  # external, unfavourable
+
+
+class ForceAssessment(BaseModel):
+    intensity: ForceLevel = Field(description="Qualitative strength of this force; cannot_assess if neither the hand-off nor general knowledge supports a view.")
+    reasoning: str = Field(description="2-4 sentences, qualitative, no invented figures or named companies.")
+    basis: ReportBasis
+    source_ids: list[str] = Field(description="Hand-off item ids this rests on; empty only for general_knowledge.")
+
+
+class FiveForces(BaseModel):
+    threat_of_new_entrants: ForceAssessment
+    bargaining_power_of_suppliers: ForceAssessment
+    bargaining_power_of_buyers: ForceAssessment
+    threat_of_substitutes: ForceAssessment
+    competitive_rivalry: ForceAssessment
+    overall_takeaway: str = Field(description="2-3 sentences on what the five forces together mean for the attractiveness of this idea for THIS owner.")
+
+
 class OpportunityReport(BaseModel):
+    swot: Swot | None = None  # None only on reports saved before SWOT was added
+    porters_five_forces: FiveForces | None = None  # None only on reports saved before this was added
     idea_summary: str = Field(description="One or two neutral sentences restating the owner's idea, from the hand-off only.")
     market_analysis: str
     technology_analysis: str
@@ -250,3 +330,11 @@ class OpportunityReport(BaseModel):
     alternative_opportunities: list[AlternativeOpportunity] = Field(
         description="At least two genuinely different alternatives (products, technology variants, derivatives, upstream/downstream, or adjacent businesses) that better fit the owner's stated capabilities than the original idea."
     )
+
+
+class OpportunityReportOut(OpportunityReport):
+    """What the LLM must return: SWOT and Five Forces are mandatory (the base class keeps them optional only
+    so that reports saved earlier still load)."""
+
+    swot: Swot
+    porters_five_forces: FiveForces
