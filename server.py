@@ -21,7 +21,11 @@ from tg_intake.web_auth import build_auth
 
 settings = get_settings()
 store = JsonStore(settings.data_dir)
-engine = IntakeEngine(GeminiLLM(settings), store, settings.history_turns)
+llm = GeminiLLM(settings)
+_model_problems = llm.verify_models()  # a model id Google does not know would otherwise fail on every single message
+if _model_problems:
+    raise SystemExit("\nCannot start:\n  - " + "\n  - ".join(_model_problems) + "\nFix TG_MODEL / TG_MODEL_* in .env.\n")
+engine = IntakeEngine(llm, store, settings.history_turns)
 locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
 app = FastAPI(title="TG Opportunity Finder - Intake")
 

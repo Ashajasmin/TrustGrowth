@@ -98,9 +98,18 @@ def label_of(key: str) -> str:
     return SPEC_BY_KEY[key].label if key in SPEC_BY_KEY else EXTRA_LABELS.get(key, key)
 
 
+OWNER_STATED_KINDS = ("fact", "decision", "assumption")  # what the owner said counts as coverage, whatever its kind
+
+
+def _owner_stated(st: ProjectState, key: str) -> list:
+    return [i for i in st.active(param=key) if i.kind in OWNER_STATED_KINDS and i.origin == "owner"]
+
+
 def param_status(st: ProjectState, key: str) -> str:
     cfg = MODES[st.mode]
-    if len(st.active("fact", key)) >= cfg.min_facts:
+    # A decision ("I prefer a staged investment") or an assumption the owner stated covers the topic just as a fact
+    # does. Counting only facts made the bot ask about risk appetite again right after the owner had answered it.
+    if len(_owner_stated(st, key)) >= cfg.min_facts:
         return "covered"
     if any(g.gap_type in ("unknown_to_owner", "not_provided") for g in st.active("gap", key)):
         return "gap"
@@ -112,20 +121,21 @@ def coverage(st: ProjectState) -> dict:
     return {k: param_status(st, k) for k in ORDER}
 
 
-def plan_next(st: ProjectState) -> Focus:
-    """Decide what the conversation should do next (pyramid: level 1 -> 2 -> 3)."""
+def plan_next(st: ProjectState, wrap_up: bool = False) -> Focus:
+    """Decide what the conversation should do next (pyramid: level 1 -> 2 -> 3).
+    wrap_up: the owner asked for the summary, so nothing further is worth asking."""
     cfg = MODES[st.mode]
     if st.phase == "awaiting_confirmation":
         return Focus("await_confirm", "await_confirm")
 
     # 1. things the owner said that are unclear or contradictory
-    for g in st.active("gap"):
+    for g in ([] if wrap_up else st.active("gap")):
         wanted = g.gap_type == "conflict" or (g.gap_type == "ambiguous" and cfg.clarify_ambiguous)
         if wanted and st.focus_attempts.get(f"clarify:{g.id}", 0) < 2:
             return Focus("clarify", f"clarify:{g.id}", param=g.param, item_id=g.id)
 
     # 2. the eight parameters, broad to deep
-    for key in ORDER:
+    for key in ([] if wrap_up else ORDER):
         status = param_status(st, key)
         if status in ("covered", "gap"):
             continue
@@ -137,12 +147,12 @@ def plan_next(st: ProjectState) -> Focus:
         return Focus("param", key, param=key)
 
     # 3. key constraints
-    if cfg.ask_constraints and not st.active(param="constraints") and st.focus_attempts.get("constraints", 0) < 1:
+    if not wrap_up and cfg.ask_constraints and not st.active(param="constraints") and st.focus_attempts.get("constraints", 0) < 1:
         return Focus("constraints", "constraints", param="constraints")
 
     # 4. scope
     if not st.active("decision", "scope"):
-        if cfg.ask_scope and st.focus_attempts.get("scope", 0) < 1:
+        if not wrap_up and cfg.ask_scope and st.focus_attempts.get("scope", 0) < 1:
             return Focus("scope", "scope", param="scope")
         if not st.active("assumption", "scope"):
             st.add_item("assumption", "scope", DEFAULT_SCOPE, origin="system", source="system_note")

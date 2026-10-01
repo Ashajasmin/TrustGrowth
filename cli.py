@@ -46,9 +46,13 @@ def main() -> None:
             print(f"{s['id']}  {s['owner'] or '-':20} {s['mode']:9} {s['phase']:22} {s['updated']}")
         return
     try:
-        engine = IntakeEngine(GeminiLLM(settings), store, settings.history_turns)
+        llm = GeminiLLM(settings)
     except LLMError as exc:
         sys.exit(str(exc))
+    model_problems = llm.verify_models()
+    if model_problems:
+        sys.exit("Cannot start:\n  - " + "\n  - ".join(model_problems))
+    engine = IntakeEngine(llm, store, settings.history_turns)
 
     if args.resume:
         st = store.load(args.resume)

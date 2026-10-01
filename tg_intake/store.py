@@ -36,6 +36,7 @@ def _suggestion_row(i) -> dict:
     return {
         "id": i.id, "name": i.attribute, "statement": i.statement, "origin": "system",
         "pros": i.pros, "cons": i.cons, "status": i.status,
+        "suggested_by_assistant_as_starting_point": i.recommended,  # the assistant's lean, never the owner's view
         "owner_reaction": i.reaction or None,
         "owner_reaction_quotes": [
             {"turn": e.turn, "quote": e.quote} for e in i.evidence if e.source_type == "owner_statement"

@@ -14,6 +14,11 @@ GREETING = (
 
 CONFIRM_NUDGE = "Whenever you are ready, reply **confirm** if the summary above is right, or tell me what to change."
 NOTE_GENERAL = " (General background only - not verified against sources. The analysis stages will check facts with evidence.)"
+NOTE_PATH_EXPLAINED = " (This explains my own suggestion in general terms - it is not a finding, and the analysis stages will test it with evidence.)"
+NOTE_DEVELOP = (
+    "_That is general reasoning about the path, not a finding. It becomes part of your view only if you say so."
+    " The later analysis stages test it with evidence._"
+)
 NOTE_CANNOT = " I have noted this question so the analysis stages can look at it with sources."
 NOTE_PATHS = (
     "_These are general possibilities for you to react to - not findings, and not verified. "
@@ -73,7 +78,7 @@ REACTIONS TO SYSTEM SUGGESTIONS
 The assistant shows suggestions to the owner as "Path 1", "Path 2", ... (the mapping is in <state>: each S item says which Path it is). When the owner reacts to one - "I like path 2", "the second one won't work for me", "path 1 but smaller" - add a reaction: target_id = the S id, stance = likes | dislikes | wants_changed | unsure, source_quote = the exact words of the reaction. Only add a reaction when the owner clearly refers to a suggestion. Whatever the owner adds in their own words (a preference, a constraint, a correction) is ALSO extracted normally with its own quote; the reaction itself is not a fact about the owner.
 
 OTHER FIELDS
-- owner_intent: providing_info | asking_question | correcting | confirm_all (owner approves the whole recap with no changes) | declining_to_answer (skip / don't know) | unclear | other. A message that reacts to suggestions or describes the idea is providing_info.
+- owner_intent: providing_info | asking_question | correcting | confirm_all (owner approves the whole recap with no changes) | declining_to_answer (skip / don't know) | wants_summary (owner says they have said enough, asks to wrap up or to see the summary, e.g. "that's all I have", "let's wrap up", "show me the summary") | unclear | other. A message that reacts to suggestions or describes the idea is providing_info.
 - requested_mode: only if the owner explicitly asks for brief / balanced / detailed; else "".
 - corrections: the owner changes something already captured (never an S item). target_id must be an owner-stated id from <state>. Also give the quote.
 - withdrawn_ids: the owner retracts a captured owner item without replacement.
@@ -126,20 +131,21 @@ SYSTEM_REPLY = f"""\
 You are the conversation agent of the TG Opportunity Finder for TrustGrowth Services LLP, talking to a business owner (typically an industrialist considering a manufacturing investment). Right now you are in the intake conversation: understand the owner and the opportunity through a natural, professional conversation - like a sharp, experienced advisor, not a form and not an interviewer.
 
 HOW YOU TALK
-- The owner speaks freely in their own words. React to what they actually said. Never make them feel interrogated: no lists of questions, never ask something already in <state>, never repeat a question they ignored or skipped.
-- Every reply GIVES something before it asks anything: a clear restatement, a useful consideration, an update after their correction, a direct answer to their question. A reply that is only a question is a failure.
-- At most ONE question per reply, and only in the `question` field. No question mark anywhere else in your output.
-- When you do ask, show in a few words why it matters ("so I can tell which of these fits you"). The owner should feel you are working on their problem, not filling a checklist.
+- You are an experienced advisor thinking WITH the owner, not interviewing them. The owner speaks freely in their own words: build on what they actually said, and lead with your view, not with a question. They came to you for a recommendation; give them something concrete to react to, because their reactions and corrections are what you are after.
+- Never make the owner feel interrogated: no lists of questions, never ask for something already in <state> or that the owner already volunteered anywhere in the conversation, never repeat a question they ignored or skipped, never ask them to pick from topics you list, never ask "anything else?".
+- Every reply GIVES something: a clear restatement, a recommendation or lean, a consideration that follows from what they said, an update after their correction, a walk-through of a path they liked, a direct answer to their question. A reply that is only a question is a failure.
+- Questions are the exception, not the rhythm. <question_budget> tells you whether you may ask one this turn. If it says NO, ask nothing: end with a statement that invites them to correct or add something (for example "Tell me where this misses."). If it says YES, ask at most ONE question, only in the `question` field, with no question mark anywhere else; choose the one whose answer would most change your advice and say in a few words why it matters.
 - Plain business language, warm but professional, concise. No filler praise ("Great!", "Thanks for sharing"), no reciting the whole state back each time. Reply in the language the owner writes in.
-- You may suggest, offer considerations and compare paths at this stage. You do NOT verify, forecast, or give figures - verification and numbers come from later stages with evidence. Follow <mode_style> for how deep to probe.
+- You may suggest, offer considerations, take a position and compare paths at this stage. You do NOT verify, forecast, or give figures - verification and numbers come from later stages with evidence. Follow <mode_style> for how deep to probe.
 
 NO HALLUCINATION
-- Facts about the owner come ONLY from <state> and <owner_message>. Never invent details about the owner, their business, resources or plans. Never state figures the owner did not give (market sizes, prices, costs, capacities, returns, timelines, percentages).
-- Paths, pros and cons are general reasoning about this KIND of business, written qualitatively ("may", "could", "typically"). Never name companies, suppliers, regulations, subsidies or statistics.
+- Facts about the owner come ONLY from <state> and <owner_message>. Never invent details about the owner, their business, resources, plans or attitudes (do not say what they "feel" or "prefer" unless <state> says so; use conditionals such as "if you want to keep this low-risk"). Never state figures the owner did not give (market sizes, prices, costs, capacities, returns, timelines, percentages).
+- Paths, pros, cons, your recommended starting point and any walk-through are general reasoning about this KIND of business, written qualitatively ("may", "could", "typically"). Never name companies, suppliers, regulations, subsidies or statistics.
 - Items marked "system suggestion" in <state> are yours, not the owner's. Never present them as something the owner said or wants. What the owner thinks of them is only what "owner reaction" says.
 - For each owner question in <owner_questions>, choose a basis:
   intake_process = how this intake or the TG process works (answer only from <process>);
   glossary = meaning of a term (answer only from <glossary>);
+  path_explanation = the owner asks you to explain, expand or compare one of YOUR suggested paths or your own previous reply: answer from <state> and general qualitative reasoning, concretely and helpfully, without figures or names;
   general_knowledge_unverified = a widely known general concept, with no specific numbers, names or claims about markets, India or regulations;
   cannot_answer = anything needing data, market facts, prices, regulations, technology specifics or advice. Say plainly that it cannot be answered at intake.
 - If something appears under "rejected" in <capture_report>, it was NOT recorded because it could not be matched to the owner's own words: ask the owner to restate that specific point (this is your one question).
@@ -178,7 +184,14 @@ def _param_hint(focus: fw.Focus, st: ProjectState) -> str:
     return ""
 
 
-def move_text(move: str, focus: fw.Focus, st: ProjectState, report) -> str:
+def _ask_text(ask_ok: bool, when_allowed: str) -> str:
+    if ask_ok:
+        return f"question: {when_allowed}"
+    return ("question: EMPTY - no question this turn (your previous reply already asked one). "
+            "End the giveback with a statement inviting the owner to correct or add something.")
+
+
+def move_text(move: str, focus: fw.Focus, st: ProjectState, report, ask_ok: bool = True) -> str:
     if move == "invite":
         return (
             "MOVE: invite. The owner has not yet said anything you can restate as an idea. "
@@ -191,6 +204,7 @@ def move_text(move: str, focus: fw.Focus, st: ProjectState, report) -> str:
             "restatement: restate the idea clearly in 1-3 sentences using only <state> and the owner's own wording; if something is unclear, say \"if I've understood\". "
             "paths: 2-3 genuinely different ways the owner could go about it (for example different scope, route to market, scale or phasing, build versus partner, product variant), tailored to what is in <state>. "
             "Each path: a short name, a 1-2 sentence summary, 2-3 qualitative pros and 2-3 qualitative cons. No figures, no names of companies. "
+            "lean_path / lean_reason: take a position. Say which ONE path you would suggest as the starting point for THIS owner and why, in 1-2 qualitative sentences that build on what they told you (for example \"given that you described ...\"). It is a suggestion to react to, not a verdict. "
             "question: ONE open question inviting their reaction - which feels closest, what they would change, what you missed. Ask nothing else. giveback: empty."
         )
     if move == "revise":
@@ -201,19 +215,32 @@ def move_text(move: str, focus: fw.Focus, st: ProjectState, report) -> str:
             "restatement: 1-2 sentences saying what you took from their reaction, in their own terms. "
             "paths: 2-3 revised paths that keep what they liked, drop or change what they disliked, and use any new information. Do not re-offer a path they rejected. "
             "Each path: name, 1-2 sentence summary, 2-3 qualitative pros, 2-3 qualitative cons. "
+            "lean_path / lean_reason: say which ONE of the revised paths you would now suggest as the starting point and why, in 1-2 qualitative sentences. "
             "question: ONE open question inviting their reaction. giveback: empty."
+        )
+    if move == "develop":
+        liked = [f"[{i.id}] {i.attribute or i.statement}: {i.reaction}" for i in st.active("suggestion") if i.reaction in ("likes", "unsure")]
+        return (
+            "MOVE: develop. The owner leaned towards a path (or is unsure about it), so take it further for THEM instead of interviewing them. "
+            f"Paths they reacted to: {'; '.join(liked) or '(see owner reactions)'}. "
+            "giveback: 4-8 sentences. Start from their own reaction and words, not from a restatement of the whole idea. Then: what this path would look like in practice in plain terms; "
+            "how what they have told you (only what is in <state>) helps it and where it is still thin; what would have to be true for it to work; and what they could test first, cheaply, before committing. "
+            "Qualitative only: no figures, no company names, no claims about markets or regulations. If they asked you to explain something, answer it concretely in `answers` with basis path_explanation. "
+            f"{_ask_text(ask_ok, 'ONE question that follows naturally from the walk-through, or empty if it is not needed.')} restatement and paths: empty."
         )
     if move == "converse":
         ask = (
-            "question: ONE question, or empty if the owner asked you questions this turn and your answers are enough. "
-            if report.new_questions
-            else "question: exactly ONE question. "
+            _ask_text(ask_ok, "ONE question, or empty if the owner asked you questions this turn and your answers are enough.")
+            if report.new_questions or not ask_ok
+            else _ask_text(ask_ok, "exactly ONE question.")
         )
+        hint = _param_hint(focus, st) if ask_ok else ""
         return (
-            "MOVE: converse. giveback: 2-5 sentences that respond substantively to what the owner just said - show you understood it (use <capture_report>), "
-            "connect it to the paths where relevant (for example which path it favours or rules out and why, or a consideration it raises), "
-            "and if they reacted to a path, respond to that reaction specifically. Add value; do not just repeat. "
-            f"{ask}{_param_hint(focus, st)} restatement and paths: empty."
+            "MOVE: converse. giveback: 3-6 sentences that respond substantively to what the owner just said. Show you understood it (use <capture_report>), "
+            "say what it changes about the picture - which path it favours or rules out and why, or a consideration it raises - and take a clear position "
+            "(for example \"on what you have said I would lean towards ...\"). If they reacted to a path, respond to that reaction specifically. "
+            "Fold in anything new they volunteered; add value, do not just repeat. "
+            f"{ask} {hint} restatement and paths: empty."
         )
     if move == "recap":
         return (
@@ -226,18 +253,21 @@ def move_text(move: str, focus: fw.Focus, st: ProjectState, report) -> str:
     )
 
 
-def reply_prompt(st, owner_text, report, focus, move, history_turns) -> str:
+def reply_prompt(st, owner_text, report, focus, move, history_turns, ask_ok: bool = True) -> str:
     captured = "\n".join(report.captured) or "(nothing new)"
     rejected = "\n".join(f"- {r['statement']}" for r in report.rejected) or "(none)"
     qs = "\n".join(f"- {q.question}" for q in report.new_questions) or "(none)"
+    budget = ("YES - you may ask ONE question this turn (only in the `question` field)." if ask_ok
+              else "NO - ask nothing this turn; your previous reply already ended in a question.")
     return (
         f"<mode_style>{fw.MODES[st.mode].style}</mode_style>\n"
+        f"<question_budget>{budget}</question_budget>\n"
         f"<state>\n{_snapshot(st)}\n</state>\n"
         f"<recent_conversation>\n{_history(st, history_turns, True)}\n</recent_conversation>\n"
         f"<owner_message>\n{owner_text}\n</owner_message>\n"
         f"<capture_report>\ncaptured:\n{captured}\nrejected:\n{rejected}\n</capture_report>\n"
         f"<owner_questions>\n{qs}\n</owner_questions>\n"
-        f"<move>\n{move_text(move, focus, st, report)}\n</move>\n"
+        f"<move>\n{move_text(move, focus, st, report, ask_ok)}\n</move>\n"
         "Return the JSON now."
     )
 

@@ -82,7 +82,12 @@ class GeminiLLM:
             "reply": settings.model_reply,
             "report": settings.model_report,
         }
-        self.thinking_level = settings.thinking_level
+        self.thinking_level = settings.thinking_level  # one level for every role, if set
+        self.thinking_levels = {
+            "analyze": settings.thinking_analyze,
+            "reply": settings.thinking_reply,
+            "report": settings.thinking_report,
+        }
         self.fallback_models = list(settings.fallback_models)
         self.attempts_per_model = max(1, settings.llm_attempts)
         self.base_delay = 1.5  # seconds; doubles after every failed attempt (plus a little jitter)
@@ -96,7 +101,27 @@ class GeminiLLM:
                 chain.append(m)
         return chain
 
-    def _config(self, system: str, model_cls: type[BaseModel], model: str, primary: str):
+    def verify_models(self) -> list:
+        """Ask the Gemini API whether each configured primary model id exists. Returns one message per id that Google
+        says does not exist (404). Network trouble or a busy service is NOT reported here: retries handle that."""
+        problems, seen = [], set()
+        for role, model in self.models.items():
+            if model in seen:
+                continue
+            seen.add(model)
+            try:
+                self._client.models.get(model=model)
+            except Exception as exc:  # noqa: BLE001
+                code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+                if code == 404:
+                    problems.append(f"model '{model}' (used for: {', '.join(r for r, m in self.models.items() if m == model)}) "
+                                    "does not exist in the Gemini API. Check the exact id on ai.google.dev/gemini-api/docs/models "
+                                    "(for example the Pro model is 'gemini-3.1-pro-preview', not 'gemini-3.1-pro').")
+                else:
+                    log.warning("could not verify model '%s' (%s): %s", model, role, str(exc)[:200])
+        return problems
+
+    def _config(self, system: str, model_cls: type[BaseModel], model: str, primary: str, role: str = ""):
         types = self._types
         cfg = {
             "system_instruction": system,
@@ -104,8 +129,9 @@ class GeminiLLM:
             "response_json_schema": json_schema(model_cls),
         }
         # The thinking level was chosen for the primary model; fallback models use their own default.
-        if self.thinking_level and model == primary:
-            cfg["thinking_config"] = types.ThinkingConfig(thinking_level=self.thinking_level.upper())
+        level = (getattr(self, "thinking_levels", {}).get(role) or self.thinking_level or "") if role else (self.thinking_level or "")
+        if level and model == primary:
+            cfg["thinking_config"] = types.ThinkingConfig(thinking_level=level.upper())
         return types.GenerateContentConfig(**cfg)
 
     def _call(self, role: str, system: str, prompt: str, model_cls: type[BaseModel]):
@@ -117,7 +143,7 @@ class GeminiLLM:
             for attempt in range(1, self.attempts_per_model + 1):
                 try:
                     resp = self._client.models.generate_content(
-                        model=model, contents=prompt, config=self._config(system, model_cls, model, chain[0])
+                        model=model, contents=prompt, config=self._config(system, model_cls, model, chain[0], role)
                     )
                     return model_cls.model_validate_json(resp.text)
                 except Exception as exc:  # noqa: BLE001 - classified below, surfaced as LLMError if nothing works

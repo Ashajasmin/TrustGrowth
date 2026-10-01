@@ -37,10 +37,11 @@ Intent = Literal[
     "confirm_all",
     "declining_to_answer",
     "unclear",
+    "wants_summary",
     "other",
 ]
 Basis = Literal[
-    "intake_process", "glossary", "general_knowledge_unverified", "cannot_answer"
+    "intake_process", "glossary", "path_explanation", "general_knowledge_unverified", "cannot_answer"
 ]
 
 PREFIX = {"fact": "F", "assumption": "A", "decision": "D", "alternative": "L", "gap": "G", "suggestion": "S"}
@@ -73,6 +74,7 @@ class Item(BaseModel):
     superseded_by: str = ""
     pros: list[str] = []  # suggestions only
     cons: list[str] = []  # suggestions only
+    recommended: bool = False  # suggestions only: the assistant's own suggested starting point (never an owner view)
     reaction: str = ""  # owner's stance on a suggestion (Stance), "" = none yet
     evidence: list[Evidence] = []
     created_turn: int = 0
@@ -245,8 +247,16 @@ class ReplyDraft(BaseModel):
     paths: list[PathOption] = Field(
         description="Only when the move is suggest/revise: 2-3 genuinely different possible paths. Otherwise empty list."
     )
+    lean_path: int = Field(
+        default=0,
+        description="Only when the move is suggest/revise: the 1-based number of the path you would suggest as a starting point for THIS owner, given what they said. 0 otherwise.",
+    )
+    lean_reason: str = Field(
+        default="",
+        description="Only when lean_path is set: 1-2 qualitative sentences on why that path is a sensible starting point, using only what the owner said. Never contains a question mark.",
+    )
     giveback: str = Field(
-        description="Only for converse/invite/recap moves: substantive non-question content (reflection, a consideration, an update). Never contains a question mark. Otherwise empty string."
+        description="Only for converse/develop/invite/recap moves: substantive non-question content (reflection, a consideration, an update, a walk-through). Never contains a question mark. Otherwise empty string."
     )
     question: str = Field(description="The single question for this reply, or empty string if the move says not to ask.")
 

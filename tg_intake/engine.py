@@ -22,10 +22,13 @@ from .llm import LLM, LLMError
 from .schema import Evidence, OwnerQuestion, ProjectState, ReplyDraft, Turn, now
 from .store import JsonStore
 
-FALLBACK = "Sorry - I had trouble processing that. Could you say it again, perhaps in a slightly different way? Nothing has been changed."
+FALLBACK = ("I couldn't process that just now - a temporary technical problem on my side, not anything you said wrong. "
+            "Please send it again in a moment. Nothing has been changed.")
 GAP_TYPES = {"unknown_to_owner", "ambiguous", "conflict"}
 MAX_PATH_ROUNDS = 4  # first suggestion + up to three revisions
-MIN_GIVEBACK_WORDS = 6
+# every reply must carry substance; a one-line acknowledgement does not count
+MIN_GIVEBACK_WORDS = {"invite": 6, "recap": 6, "await": 0, "converse": 20, "develop": 40}
+SOFT_PROBLEMS = ("`question` is empty", "lean_path", "lean_reason")  # worth a retry, never worth dropping the whole reply
 
 
 @dataclass
@@ -90,13 +93,19 @@ class IntakeEngine:
             if report.changed:
                 st.phase = "intake"
 
-        focus = fw.plan_next(st)
+        # The owner can end the conversation whenever they like: whatever was never discussed is recorded honestly as
+        # "not discussed" and the summary follows. (Only after we have given them paths to react to.)
+        wrap_up = analysis.owner_intent == "wants_summary" and self._has_idea(st) and st.path_rounds > 0
+        if wrap_up:
+            self._record_undiscussed(st)
+        focus = fw.plan_next(st, wrap_up=wrap_up)
         move = self._decide_move(st, focus, report)
         if move == "recap":
             st.phase = "awaiting_confirmation"
-        st.audit.append({"turn": st.turn, "event": "move", "move": move, "focus": focus.key})
+        ask_ok = self._question_allowed(st, move, report)
+        st.audit.append({"turn": st.turn, "event": "move", "move": move, "focus": focus.key, "question_allowed": ask_ok})
 
-        draft = self._draft_reply(st, text, report, focus, move)
+        draft = self._draft_reply(st, text, report, focus, move, ask_ok)
         if draft is None:  # the model could not produce a valid reply; say so honestly, keep the state
             if move == "recap":
                 st.phase = "intake"
@@ -107,6 +116,13 @@ class IntakeEngine:
     @staticmethod
     def _has_idea(st: ProjectState) -> bool:
         return bool(st.active("fact", "objective") or st.active("decision", "objective"))
+
+    @staticmethod
+    def _record_undiscussed(st: ProjectState) -> None:
+        for key in fw.ORDER:
+            if fw.param_status(st, key) == "empty":
+                st.add_item("gap", key, f"Not discussed before the owner asked for the summary: {fw.label_of(key)}.",
+                            origin="system", source="system_note", gap_type="not_provided")
 
     def _decide_move(self, st: ProjectState, focus: fw.Focus, report: ApplyReport) -> str:
         if focus.kind == "await_confirm":
@@ -120,7 +136,26 @@ class IntakeEngine:
             return "revise"
         if focus.kind == "recap":
             return "recap"
+        if self._wants_path_developed(report):
+            return "develop"  # they leaned towards a path: take it further instead of interviewing them
         return "converse"
+
+    @staticmethod
+    def _question_allowed(st: ProjectState, move: str, report: ApplyReport) -> bool:
+        """Question budget. Never a question after the summary is shown; always one when the owner must be invited to
+        describe or to react; otherwise only when the previous reply did NOT already end in a question. That alone
+        breaks the question -> answer -> question -> answer rhythm that reads as an interrogation."""
+        if move in ("recap", "await"):
+            return False
+        if move in ("invite", "suggest", "revise"):
+            return True
+        if report.rejected:  # something the owner said could not be recorded: asking to restate it is the one exception
+            return True
+        return not st.last_bot_question.strip()
+
+    @staticmethod
+    def _wants_path_developed(report: ApplyReport) -> bool:
+        return any(stance in ("likes", "unsure") for _, stance in report.reactions)
 
     @staticmethod
     def _wants_revision(report: ApplyReport) -> bool:
@@ -233,7 +268,7 @@ class IntakeEngine:
     @staticmethod
     def _texts(d: ReplyDraft) -> list:
         """Every free-text field of a draft except `question`."""
-        out = [a.answer for a in d.answers] + [d.restatement, d.giveback]
+        out = [a.answer for a in d.answers] + [d.restatement, d.giveback, d.lean_reason]
         for p in d.paths:
             out += [p.name, p.summary] + list(p.pros) + list(p.cons)
         return out
@@ -241,7 +276,7 @@ class IntakeEngine:
     def _draft_text(self, d: ReplyDraft) -> str:
         return " ".join(self._texts(d) + [d.question])
 
-    def _problems(self, d: ReplyDraft, move: str, report: ApplyReport, allowed: set) -> list:
+    def _problems(self, d: ReplyDraft, move: str, report: ApplyReport, allowed: set, ask_ok: bool = True) -> list:
         problems = []
         bad = guards.unsupported_numbers(self._draft_text(d), allowed)
         if bad:
@@ -250,12 +285,16 @@ class IntakeEngine:
             problems.append("a question mark appears outside the `question` field. Questions may appear only in `question`")
         if guards.question_marks(d.question) > 1:
             problems.append("`question` holds more than one question. Ask exactly one")
-        problems += self._shape_problems(d, move, report)
+        if d.question.strip() and "?" not in d.question:
+            problems.append("`question` is not a question (no question mark). Write one real question or leave it empty")
+        problems += self._shape_problems(d, move, report, ask_ok)
         return problems
 
     @staticmethod
-    def _shape_problems(d: ReplyDraft, move: str, report: ApplyReport) -> list:
+    def _shape_problems(d: ReplyDraft, move: str, report: ApplyReport, ask_ok: bool = True) -> list:
         p = []
+        if not ask_ok and d.question.strip():
+            p.append("no question is allowed this turn (your previous reply already asked one): leave `question` empty and end the giveback with a statement that invites the owner to correct or add something")
         if move in ("suggest", "revise"):
             if not d.restatement.strip():
                 p.append("`restatement` is empty")
@@ -266,25 +305,30 @@ class IntakeEngine:
                     p.append(f"path {i} needs a name and a summary")
                 if not [x for x in path.pros if x.strip()] or not [x for x in path.cons if x.strip()]:
                     p.append(f"path {i} needs at least one pro and one con")
+            if not 1 <= d.lean_path <= max(len(d.paths), 1):
+                p.append("lean_path must be the number of the path you would suggest as the owner's starting point")
+            elif not d.lean_reason.strip():
+                p.append("lean_reason is empty: say in 1-2 qualitative sentences why that path is a sensible starting point")
             if not d.question.strip():
                 p.append("`question` is empty; ask one open question inviting the owner's reaction")
-        elif move in ("invite", "converse", "recap"):
-            if len(d.giveback.split()) < MIN_GIVEBACK_WORDS:
-                p.append("`giveback` is missing or too short; every reply must give something substantive, not only ask")
+        elif move in ("invite", "converse", "develop", "recap"):
+            need = MIN_GIVEBACK_WORDS[move]
+            if len(d.giveback.split()) < need:
+                p.append(f"`giveback` is missing or too short (at least {need} words): every reply must give something substantive, not only ask")
             if d.paths or d.restatement.strip():
                 p.append("`paths` and `restatement` must be empty for this move")
             if move == "invite" and not d.question.strip():
                 p.append("`question` is empty; invite the owner to describe the idea")
-            if move == "converse" and not d.question.strip() and not report.new_questions:
+            if move == "converse" and ask_ok and not d.question.strip() and not report.new_questions:
                 p.append("`question` is empty; ask exactly one question")
             if move == "recap" and d.question.strip():
                 p.append("`question` must be empty for the recap")
         return p
 
-    def _draft_reply(self, st, text, report, focus, move):
+    def _draft_reply(self, st, text, report, focus, move, ask_ok=True):
         """Ask the model, check the shape and figures in code, retry once with the exact violations.
         Returns None when no usable reply could be produced (the caller then says so honestly)."""
-        prompt = prompts.reply_prompt(st, text, report, focus, move, self.history_turns)
+        prompt = prompts.reply_prompt(st, text, report, focus, move, self.history_turns, ask_ok)
         allowed = self._allowed_numbers(st)
         draft, problems = None, []
         for attempt in range(2):
@@ -293,7 +337,7 @@ class IntakeEngine:
             except LLMError as exc:
                 st.audit.append({"turn": st.turn, "event": "reply_failed", "error": str(exc)[:300]})
                 return None
-            problems = self._problems(draft, move, report, allowed)
+            problems = self._problems(draft, move, report, allowed, ask_ok)
             if not problems:
                 break
             st.audit.append({"turn": st.turn, "event": "reply_retry" if attempt == 0 else "reply_still_invalid",
@@ -307,6 +351,7 @@ class IntakeEngine:
                 a.answer = guards.redact_sentences_with(a.answer, bad)
             draft.restatement = guards.redact_sentences_with(draft.restatement, bad)
             draft.giveback = guards.redact_sentences_with(draft.giveback, bad)
+            draft.lean_reason = guards.redact_sentences_with(draft.lean_reason, bad)
             draft.question = guards.redact_sentences_with(draft.question, bad)
             for path in draft.paths:
                 path.summary = guards.redact_sentences_with(path.summary, bad)
@@ -316,31 +361,37 @@ class IntakeEngine:
             a.answer = guards.strip_question_sentences(a.answer)
         draft.restatement = guards.strip_question_sentences(draft.restatement)
         draft.giveback = guards.strip_question_sentences(draft.giveback)
-        draft.question = guards.first_question(draft.question) if "?" in draft.question else draft.question.strip()
-        if move in ("recap", "await"):
+        draft.lean_reason = guards.strip_question_sentences(draft.lean_reason)
+        draft.question = guards.first_question(draft.question) if "?" in draft.question else ""  # a non-question is dropped, not shown
+        if move in ("recap", "await") or not ask_ok:
             draft.question = ""
 
         # Final gate on what cannot be repaired by removal: the reply must still carry content.
-        hard = [x for x in self._shape_problems(draft, move, report) if "`question` is empty" not in x]
+        hard = [x for x in self._shape_problems(draft, move, report, ask_ok) if not x.startswith(SOFT_PROBLEMS)]
         if hard:
             st.audit.append({"turn": st.turn, "event": "reply_unusable", "problems": hard})
             return None
         return draft
 
-    def _register_paths(self, st: ProjectState, paths) -> str:
-        """Store the paths as SYSTEM suggestions (superseding the previous round) and render them for the owner."""
+    def _register_paths(self, st: ProjectState, paths, lean_path: int = 0, lean_reason: str = "") -> str:
+        """Store the paths as SYSTEM suggestions (superseding the previous round) and render them for the owner.
+        The assistant's suggested starting point is a system suggestion too: it is flagged on the item, never an owner view."""
         for old in st.active("suggestion"):
             old.status, old.updated_at = "superseded", now()
+        lean_ok = 1 <= lean_path <= len(paths) and bool(lean_reason.strip())
         blocks = []
         for n, p in enumerate(paths, 1):
             pros = [x.strip() for x in p.pros if x.strip()]
             cons = [x.strip() for x in p.cons if x.strip()]
-            st.add_item("suggestion", "objective", f"{p.name.strip()}: {p.summary.strip()}", attribute=p.name.strip(),
-                        origin="system", source="system_note", pros=pros, cons=cons)
+            item = st.add_item("suggestion", "objective", f"{p.name.strip()}: {p.summary.strip()}", attribute=p.name.strip(),
+                               origin="system", source="system_note", pros=pros, cons=cons)
+            item.recommended = lean_ok and n == lean_path
             blocks.append(
                 f"**Path {n} - {p.name.strip()}**\n{p.summary.strip()}\n"
                 f"- **Pros:** {'; '.join(pros)}\n- **Cons:** {'; '.join(cons)}"
             )
+        if lean_ok:
+            blocks.append(f"**If I had to pick a starting point for you: Path {lean_path}.** {lean_reason.strip()}")
         st.path_rounds += 1
         st.paths_turn = st.turn
         return "\n\n".join(blocks)
@@ -351,7 +402,7 @@ class IntakeEngine:
         for idx, qa in enumerate(draft.answers[: len(report.new_questions)]):
             oq = report.new_questions[idx]
             oq.answer_basis = qa.basis
-            oq.answered = qa.basis in ("intake_process", "glossary") and bool(qa.answer.strip())
+            oq.answered = qa.basis in ("intake_process", "glossary", "path_explanation") and bool(qa.answer.strip())
             answered.add(idx)
             text = qa.answer.strip()
             if not text:
@@ -359,6 +410,8 @@ class IntakeEngine:
                 text = "I can't answer that at the intake stage."
             if oq.answer_basis == "general_knowledge_unverified":
                 text += prompts.NOTE_GENERAL
+            elif oq.answer_basis == "path_explanation":
+                text += prompts.NOTE_PATH_EXPLAINED
             elif not oq.answered:
                 text += prompts.NOTE_CANNOT
             parts.append(text)
@@ -369,10 +422,12 @@ class IntakeEngine:
 
         if move in ("suggest", "revise"):
             parts.append(draft.restatement.strip())
-            parts.append(self._register_paths(st, draft.paths))
+            parts.append(self._register_paths(st, draft.paths, draft.lean_path, draft.lean_reason))
             parts.append(prompts.NOTE_PATHS)
         elif draft.giveback.strip():
             parts.append(draft.giveback.strip())
+            if move == "develop":
+                parts.append(prompts.NOTE_DEVELOP)
 
         if move == "recap":
             parts.append(fw.render_recap(st))
@@ -389,6 +444,8 @@ class IntakeEngine:
             st.last_focus = "objective"
         elif move == "converse":
             st.last_focus = focus.key if question else ""  # no question asked -> nothing to count against the owner
+        elif move == "develop":
+            st.last_focus = "paths" if question else ""
         else:
             st.last_focus = focus.key
         st.last_move = move
